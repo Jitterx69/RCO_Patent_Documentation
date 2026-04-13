@@ -1,0 +1,1327 @@
+\section{Technical Context and Problem Statement}
+
+The evolution of modern computational systems has led to the emergence of architectures in which the distinction between observation and computation is no longer strictly separable. In classical computational paradigms, a system is modeled as a mapping from inputs to outputs, wherein observational data is treated as an external artifact that does not influence the internal state transition dynamics. However, contemporary systems, particularly those arising in machine learning, reinforcement learning, adaptive control, and autonomous decision-making domains, exhibit a fundamentally different structure characterized by feedback-coupled interactions between system state and observational disclosures.
+
+Let the computational system be defined over a measurable state space $\mathcal{S} \subseteq \mathbb{R}^n$, an action space $\mathcal{A} \subseteq \mathbb{R}^m$, and a telemetry or disclosure space $\mathcal{D} \subseteq \mathbb{R}^k$. The temporal evolution of the system may be described by a transition operator $\mathcal{F}$ such that:
+
+\begin{equation}
+S_{t+1} = \mathcal{F}(S_t, A_t, \Theta_t)
+\end{equation}
+
+where $\Theta_t$ denotes latent parameters that may include model weights, environmental parameters, or control coefficients. In traditional formulations, telemetry is defined as a projection:
+
+\begin{equation}
+D_t = \mathcal{G}(S_t, A_t)
+\end{equation}
+
+where $\mathcal{G}$ is an observation operator that does not feed back into the system. This assumption implies that the trajectory $\{S_t\}$ is independent of the representation or transmission of $D_t$.
+
+This assumption fails in feedback-coupled systems. In such systems, telemetry is reintegrated into the computational loop, yielding a generalized transition operator:
+
+\begin{equation}
+S_{t+1} = \mathcal{F}(S_t, A_t, D_t, \Theta_t)
+\end{equation}
+
+This formulation implies that the system evolves not only as a function of its internal state and actions but also as a function of its disclosed observational history. The telemetry stream $\{D_t\}$ thus becomes an endogenous variable within the system dynamics.
+
+To formalize this interaction, define the trajectory operator:
+
+\begin{equation}
+\Phi: \mathcal{S} \times \mathcal{A}^{T} \times \mathcal{D}^{T} \rightarrow \mathcal{S}^{T}
+\end{equation}
+
+such that:
+
+\begin{equation}
+\Phi(S_0, \{A_t\}, \{D_t\}) = \{S_t\}_{t=0}^{T}
+\end{equation}
+
+A necessary condition for reproducibility in such systems is that $\Phi$ be invariant under equivalent telemetry representations. That is, for any two telemetry sequences $D$ and $\tilde{D}$ satisfying semantic equivalence $D \equiv \tilde{D}$, the following condition must hold:
+
+\begin{equation}
+\Phi(S_0, A, D) = \Phi(S_0, A, \tilde{D})
+\end{equation}
+
+However, in practical implementations, telemetry is not represented as an abstract element of $\mathcal{D}$ but as a binary encoding produced by an encoding function:
+
+\begin{equation}
+\mathcal{E}: \mathcal{D} \rightarrow \{0,1\}^*
+\end{equation}
+
+Thus, the actual system dynamics depend on $\mathcal{E}(D_t)$ rather than $D_t$ itself, yielding:
+
+\begin{equation}
+S_{t+1} = \mathcal{F}(S_t, A_t, \mathcal{E}(D_t), \Theta_t)
+\end{equation}
+
+This introduces a critical dependency on the properties of $\mathcal{E}$. In particular, for reproducibility, $\mathcal{E}$ must satisfy injective consistency:
+
+\begin{equation}
+D_1 \equiv D_2 \implies \mathcal{E}(D_1) = \mathcal{E}(D_2)
+\end{equation}
+
+In conventional systems, this condition is violated. For example, consider floating-point representations. Let $x \in \mathbb{R}$ be a real-valued telemetry component. Due to IEEE-754 representation differences across architectures, there exist encodings $\mathcal{E}_1(x)$ and $\mathcal{E}_2(x)$ such that:
+
+\begin{equation}
+x = x \quad \text{but} \quad \mathcal{E}_1(x) \neq \mathcal{E}_2(x)
+\end{equation}
+
+More generally, for structured data $D$ composed of multiple fields, the absence of canonical ordering implies:
+
+\begin{equation}
+\exists \pi \in S_n \text{ such that } \mathcal{E}(D) \neq \mathcal{E}(\pi(D))
+\end{equation}
+
+where $\pi$ is a permutation of key ordering. This non-uniqueness of representation introduces ambiguity in downstream operations, particularly cryptographic hashing.
+
+Let $\mathcal{H}: \{0,1\}^* \rightarrow \{0,1\}^k$ be a cryptographic hash function. Then:
+
+\begin{equation}
+\mathcal{H}(\mathcal{E}(D_1)) \neq \mathcal{H}(\mathcal{E}(D_2)) \quad \text{even if} \quad D_1 \equiv D_2
+\end{equation}
+
+This violates the fundamental requirement for deterministic verification.
+
+Furthermore, consider a distributed system consisting of nodes indexed by $i \in \mathcal{I}$, each with hardware configuration $\mathcal{H}_i$ and runtime environment $\mathcal{R}_i$. The encoding function becomes node-dependent:
+
+\begin{equation}
+\mathcal{E}_i = \mathcal{E}_{\mathcal{H}_i, \mathcal{R}_i}
+\end{equation}
+
+Thus, for a fixed logical telemetry element $D$, the system produces a family of encodings:
+
+\begin{equation}
+\{\mathcal{E}_i(D)\}_{i \in \mathcal{I}}
+\end{equation}
+
+which are not guaranteed to be identical. This lack of invariance across nodes leads to divergence in hash values, lineage construction, and ultimately system state evolution.
+
+To quantify the impact of such discrepancies, define the encoding error:
+
+\begin{equation}
+\epsilon_i(D) = \|\mathcal{E}_i(D) - \mathcal{E}^*(D)\|
+\end{equation}
+
+where $\mathcal{E}^*$ is the ideal canonical encoding. The propagation of this error into system dynamics can be expressed as:
+
+\begin{equation}
+S_{t+1} = \mathcal{F}(S_t, A_t, \mathcal{E}^*(D_t) + \epsilon_t, \Theta_t)
+\end{equation}
+
+Under Lipschitz continuity assumptions:
+
+\begin{equation}
+\|S_{t+1} - S_{t+1}^*\| \leq L_d \|\epsilon_t\|
+\end{equation}
+
+and recursively:
+
+\begin{equation}
+\|S_t - S_t^*\| \leq \sum_{k=0}^{t-1} L_d L_s^{t-1-k} \|\epsilon_k\|
+\end{equation}
+
+where $L_s$ and $L_d$ are Lipschitz constants. This demonstrates that encoding inconsistencies, even if small, accumulate over time and can significantly alter system trajectories.
+
+The problem is further exacerbated by the absence of lineage constraints. Let $D_t$ denote telemetry at time $t$. In conventional systems, there is no enforced relation between $D_t$ and $D_{t-1}$. Thus, the sequence $\{D_t\}$ may be arbitrarily modified without detection. Define a lineage function:
+
+\begin{equation}
+L_t = \mathcal{H}(D_t \concat L_{t-1})
+\end{equation}
+
+In existing systems, no such function is enforced, implying that:
+
+\begin{equation}
+\exists D_t', \quad L_t' \neq L_t \quad \text{but system does not detect inconsistency}
+\end{equation}
+
+This lack of continuity guarantees allows for replay attacks, omission of intermediate states, and insertion of fabricated data.
+
+Additionally, consider the absence of provenance binding. Let $\Sigma_t$ denote a signature associated with telemetry $D_t$. In conventional systems:
+
+\begin{equation}
+\Sigma_t = \text{Sign}(D_t, K)
+\end{equation}
+
+This signature verifies the origin of $D_t$ but does not guarantee that $D_t$ is consistent with the internal state $S_t$. Thus, authenticity does not imply correctness.
+
+The combination of non-deterministic encoding, absence of lineage, and lack of state binding leads to a fundamental breakdown of system integrity. The telemetry stream ceases to be a reliable representation of system behavior and instead becomes a source of uncertainty and potential manipulation.
+
+Therefore, there exists a critical need for a framework that enforces deterministic representation, cryptographic continuity, and verifiable provenance of telemetry data. Such a framework must operate across heterogeneous environments, maintain scalability, and provide strong guarantees against both accidental inconsistencies and adversarial manipulation.
+
+\section{Causative Telemetry Distortion}
+
+The integration of telemetry into the state transition operator fundamentally alters the mathematical structure of the computational system by introducing a feedback-dependent perturbation channel. In classical systems, observational data is decoupled from the evolution operator, allowing the system to be analyzed independently of its representation. However, in feedback-coupled systems, telemetry becomes an endogenous variable that participates directly in the evolution of the system state, thereby introducing a new class of instability mechanisms that arise from inconsistencies in representation, transmission, or validation.
+
+Let the system dynamics be defined over a state space $\mathcal{S}$ with transition operator $\mathcal{F}: \mathcal{S} \times \mathcal{A} \times \mathcal{D} \rightarrow \mathcal{S}$. The evolution of the system is given by:
+
+\begin{equation}
+S_{t+1} = \mathcal{F}(S_t, A_t, D_t)
+\end{equation}
+
+Consider an ideal telemetry sequence $\{D_t\}$ and a perturbed sequence $\{\tilde{D}_t\}$ such that:
+
+\begin{equation}
+\tilde{D}_t = D_t + \delta_t
+\end{equation}
+
+where $\delta_t$ represents a perturbation induced by encoding inconsistency, numerical drift, or adversarial manipulation. Let the corresponding state trajectories be $\{S_t\}$ and $\{\tilde{S}_t\}$, respectively, defined by:
+
+\begin{equation}
+S_{t+1} = \mathcal{F}(S_t, A_t, D_t), \quad \tilde{S}_{t+1} = \mathcal{F}(\tilde{S}_t, A_t, \tilde{D}_t)
+\end{equation}
+
+Define the trajectory divergence:
+
+\begin{equation}
+\Delta_t = \| S_t - \tilde{S}_t \|
+\end{equation}
+
+Assuming that $\mathcal{F}$ is Lipschitz continuous in both state and telemetry inputs, there exist constants $L_s, L_d > 0$ such that:
+
+\begin{equation}
+\|\mathcal{F}(S_1, A, D_1) - \mathcal{F}(S_2, A, D_2)\| \leq L_s \|S_1 - S_2\| + L_d \|D_1 - D_2\|
+\end{equation}
+
+Applying this to the trajectories yields:
+
+\begin{equation}
+\Delta_{t+1} \leq L_s \Delta_t + L_d \|\delta_t\|
+\end{equation}
+
+This recursive inequality defines a non-homogeneous linear difference equation whose solution can be expressed as:
+
+\begin{equation}
+\Delta_t \leq L_s^t \Delta_0 + \sum_{k=0}^{t-1} L_s^{t-1-k} L_d \|\delta_k\|
+\end{equation}
+
+This expression reveals two critical regimes. In the case where $L_s < 1$, the system exhibits contractive behavior and perturbations decay over time. However, in many practical systems, particularly those involving iterative optimization or reinforcement learning, the effective Lipschitz constant may satisfy $L_s \geq 1$, leading to amplification of perturbations. In such regimes, even small perturbations $\delta_t$ can result in exponential divergence of trajectories.
+
+To further analyze stability, consider a Lyapunov candidate function $V: \mathcal{S} \rightarrow \mathbb{R}_{\geq 0}$ defined as:
+
+\begin{equation}
+V(S_t, \tilde{S}_t) = \|S_t - \tilde{S}_t\|^2
+\end{equation}
+
+Then:
+
+\begin{equation}
+V(S_{t+1}, \tilde{S}_{t+1}) \leq (L_s \Delta_t + L_d \|\delta_t\|)^2
+\end{equation}
+
+Expanding:
+
+\begin{equation}
+V_{t+1} \leq L_s^2 V_t + 2L_s L_d \Delta_t \|\delta_t\| + L_d^2 \|\delta_t\|^2
+\end{equation}
+
+This inequality demonstrates that the stability of the system is directly influenced by the magnitude and persistence of telemetry perturbations. In the absence of strict control over $\delta_t$, the Lyapunov function may increase unbounded, indicating instability.
+
+In adversarial contexts, an attacker may intentionally construct perturbations $\delta_t$ that are small in magnitude but strategically aligned with the system dynamics to maximize divergence. Consider an adversary that selects $\delta_t$ such that:
+
+\begin{equation}
+\delta_t = \epsilon \cdot \frac{\nabla_{D_t} \mathcal{F}(S_t, A_t, D_t)}{\|\nabla_{D_t} \mathcal{F}(S_t, A_t, D_t)\|}
+\end{equation}
+
+where $\epsilon$ is a small scalar. This perturbation aligns with the direction of maximum sensitivity of the transition operator, thereby maximizing its impact on $S_{t+1}$. Over multiple iterations, such perturbations can induce significant divergence while remaining within acceptable noise thresholds.
+
+Furthermore, the problem is compounded by temporal accumulation. Define the cumulative perturbation energy:
+
+\begin{equation}
+E_T = \sum_{t=0}^{T} \|\delta_t\|^2
+\end{equation}
+
+Then the trajectory divergence satisfies:
+
+\begin{equation}
+\Delta_T \leq L_s^T \Delta_0 + L_d \sum_{k=0}^{T-1} L_s^{T-1-k} \|\delta_k\|
+\end{equation}
+
+Using Cauchy-Schwarz inequality:
+
+\begin{equation}
+\Delta_T \leq L_s^T \Delta_0 + L_d \left( \sum_{k=0}^{T-1} L_s^{2(T-1-k)} \right)^{1/2} \cdot \sqrt{E_T}
+\end{equation}
+
+This establishes that the divergence is bounded by the cumulative energy of perturbations weighted by system sensitivity. In systems with large $L_s$, this bound becomes loose, indicating high susceptibility to perturbation amplification.
+
+Another critical aspect of Causative Telemetry Distortion is its interaction with stochasticity. In systems where $\delta_t$ is modeled as a stochastic process with variance $\sigma^2$, the expected divergence satisfies:
+
+\begin{equation}
+\mathbb{E}[\Delta_t^2] \leq L_s^2 \mathbb{E}[\Delta_{t-1}^2] + L_d^2 \sigma^2
+\end{equation}
+
+Solving this recursion yields:
+
+\begin{equation}
+\mathbb{E}[\Delta_t^2] \leq L_s^{2t} \Delta_0^2 + L_d^2 \sigma^2 \sum_{k=0}^{t-1} L_s^{2k}
+\end{equation}
+
+If $L_s > 1$, the expected divergence grows exponentially, indicating that even random noise in telemetry can destabilize the system.
+
+The implications of these results are profound. They demonstrate that telemetry integrity is not merely a matter of data correctness but a fundamental requirement for system stability. Any inconsistency in telemetry, regardless of its origin, acts as a perturbation that propagates through the system dynamics and may be amplified over time.
+
+To mitigate this phenomenon, it is necessary to enforce constraints on the telemetry channel such that $\delta_t = 0$ for all $t$ in the ideal case. This requires that telemetry be represented deterministically, transmitted without alteration, and verified upon ingestion. Additionally, the system must enforce continuity constraints to ensure that the sequence $\{D_t\}$ is complete and unaltered.
+
+Define a deterministic telemetry operator $\mathcal{E}$ and a verification function $\mathcal{V}$ such that:
+
+\begin{equation}
+\mathcal{V}(\mathcal{E}(D_t)) = \text{true} \iff \delta_t = 0
+\end{equation}
+
+Then the system achieves distortion-free evolution:
+
+\begin{equation}
+S_{t+1} = \mathcal{F}(S_t, A_t, \mathcal{E}(D_t))
+\end{equation}
+
+with guaranteed consistency across executions.
+
+In summary, Causative Telemetry Distortion represents a fundamental instability mechanism in feedback-coupled systems arising from inconsistencies in telemetry representation and transmission. The mathematical analysis demonstrates that even small perturbations can be amplified over time, leading to significant divergence in system behavior. This establishes the necessity for a rigorous framework that enforces deterministic telemetry representation, cryptographic integrity, and continuity constraints to eliminate distortion and ensure reproducibility.
+\section{Limitations of Existing Systems}
+
+The deficiencies of existing telemetry and experiment tracking systems may be rigorously characterized as violations of fundamental mathematical invariants required for deterministic, verifiable, and stable feedback-coupled computation. While such systems are often designed with scalability and usability in mind, their underlying abstractions fail to enforce properties necessary for preserving the integrity of telemetry as a causal component of system evolution.
+
+To formalize these limitations, consider the telemetry pipeline as a composite operator:
+
+\begin{equation}
+\mathcal{T} = \mathcal{P} \circ \mathcal{H} \circ \mathcal{E}
+\end{equation}
+
+where $\mathcal{E}$ is the encoding function, $\mathcal{H}$ is a cryptographic hashing function, and $\mathcal{P}$ is a persistence or storage operator. For the system to be deterministic and verifiable, $\mathcal{T}$ must satisfy invariance under semantic equivalence:
+
+\begin{equation}
+D_1 \equiv D_2 \implies \mathcal{T}(D_1) = \mathcal{T}(D_2)
+\end{equation}
+
+In existing systems, this condition is violated at multiple levels.
+
+\subsection{Non-Deterministic Serialization as a Violation of Encoding Invariance}
+
+Let $\mathcal{E}$ denote the encoding function used by a telemetry system. In an ideal system, $\mathcal{E}$ must be canonical, meaning that it defines a unique mapping from logical data structures to binary representations. Formally, for any $D_1, D_2 \in \mathcal{D}$:
+
+\begin{equation}
+D_1 \equiv D_2 \implies \mathcal{E}(D_1) = \mathcal{E}(D_2)
+\end{equation}
+
+However, in conventional systems utilizing formats such as JSON or protocol buffers, the encoding function is not injectively consistent. Consider a dictionary-like structure:
+
+\begin{equation}
+D = \{(k_1, v_1), (k_2, v_2)\}
+\end{equation}
+
+Then multiple encodings exist:
+
+\begin{equation}
+\mathcal{E}_1(D) = \texttt{\{k_1:v_1, k_2:v_2\}}, \quad
+\mathcal{E}_2(D) = \texttt{\{k_2:v_2, k_1:v_1\}}
+\end{equation}
+
+Despite $D$ being identical, $\mathcal{E}_1(D) \neq \mathcal{E}_2(D)$, violating determinism. This non-uniqueness propagates into hashing:
+
+\begin{equation}
+\mathcal{H}(\mathcal{E}_1(D)) \neq \mathcal{H}(\mathcal{E}_2(D))
+\end{equation}
+
+Thus, identical logical telemetry produces divergent cryptographic identities.
+
+Furthermore, floating-point representations introduce additional non-determinism. Let $x \in \mathbb{R}$ be represented in finite precision. Due to rounding and architecture-dependent implementations:
+
+\begin{equation}
+\mathcal{E}_{\mathcal{H}_1}(x) \neq \mathcal{E}_{\mathcal{H}_2}(x)
+\end{equation}
+
+even though $x$ is semantically identical. This leads to a violation of cross-platform consistency:
+
+\begin{equation}
+\exists D, \quad \mathcal{E}_{\mathcal{H}_1}(D) \neq \mathcal{E}_{\mathcal{H}_2}(D)
+\end{equation}
+
+which directly undermines reproducibility.
+
+\subsection{Absence of Cryptographic Lineage as a Failure of Temporal Integrity}
+
+In a system with temporal evolution, telemetry must form a sequence $\{D_t\}$ that preserves ordering and continuity. Define a lineage function:
+
+\begin{equation}
+L_t = \mathcal{H}(\mathcal{E}(D_t) \concat L_{t-1})
+\end{equation}
+
+This recursive construction ensures that any modification to $D_k$ for $k < t$ propagates forward and alters $L_t$.
+
+In existing systems, no such constraint is enforced. Telemetry entries are stored independently, meaning:
+
+\begin{equation}
+\exists \{D_t\}, \{D_t'\} \text{ such that } D_k' \neq D_k \text{ for some } k < t \quad \text{but system does not detect}
+\end{equation}
+
+This implies that the system lacks temporal integrity. The absence of lineage enforcement allows for arbitrary modification, deletion, or insertion of telemetry entries without invalidating subsequent records.
+
+Formally, the system fails to enforce the invariant:
+
+\begin{equation}
+\forall t, \quad L_t = f(L_{t-1}, D_t)
+\end{equation}
+
+for some deterministic function $f$. Without this invariant, the telemetry sequence does not define a valid chain and cannot be audited.
+
+\subsection{Single-Actor Trust Models as a Failure of Byzantine Resilience}
+
+Existing systems frequently rely on a single signing authority to validate telemetry. Let $K$ denote a private key and $\sigma$ a signature function:
+
+\begin{equation}
+\sigma_t = \text{Sign}(D_t, K)
+\end{equation}
+
+Verification is performed as:
+
+\begin{equation}
+\text{Verify}(D_t, \sigma_t, PK) = \text{true}
+\end{equation}
+
+While this ensures authenticity under the assumption that $K$ is secure, it introduces a critical vulnerability. If $K$ is compromised, an adversary can generate valid signatures for arbitrary data:
+
+\begin{equation}
+\exists D_t', \quad \text{Verify}(D_t', \sigma_t', PK) = \text{true}
+\end{equation}
+
+where $\sigma_t' = \text{Sign}(D_t', K)$. This implies that the system cannot distinguish between legitimate and malicious telemetry once the key is compromised.
+
+From a distributed systems perspective, this represents a failure to tolerate Byzantine faults. Let the system consist of $n$ nodes, and let one node be compromised. In a single-actor model, the adversary gains full control over the validation process. The system lacks redundancy and cannot enforce consensus.
+
+\subsection{Absence of State Binding as a Failure of Semantic Consistency}
+
+Even in systems where signatures are employed, the verification process typically ensures only that the data originated from a particular entity, not that it is consistent with the internal state of that entity. Let $S_t$ denote the internal state and $D_t$ the telemetry. In existing systems:
+
+\begin{equation}
+\Sigma_t = \text{Sign}(D_t, K)
+\end{equation}
+
+but there is no constraint that:
+
+\begin{equation}
+D_t = \mathcal{G}(S_t)
+\end{equation}
+
+for a valid observation function $\mathcal{G}$. Thus, an adversary controlling the node can produce arbitrary $D_t'$ and sign it, resulting in:
+
+\begin{equation}
+\text{Verify}(D_t', \Sigma_t', PK) = \text{true}
+\end{equation}
+
+while $D_t'$ is not consistent with $S_t$. This represents a failure of semantic integrity, wherein structurally valid data does not correspond to the actual system behavior.
+
+\subsection{Inadequate Replay and Omission Protection as a Failure of Sequence Constraints}
+
+In a temporally ordered system, telemetry must satisfy strict sequencing constraints. Let $t$ denote the index of a telemetry entry. A valid sequence must satisfy:
+
+\begin{equation}
+t = t_{\text{prev}} + 1
+\end{equation}
+
+In existing systems, this constraint is not enforced. As a result, adversaries may perform replay attacks by reusing previous telemetry entries:
+
+\begin{equation}
+D_t' = D_k \quad \text{for some } k < t
+\end{equation}
+
+or omission attacks by removing entries from the sequence. Without lineage enforcement, these manipulations are not detectable.
+
+Formally, the system fails to enforce injectivity of the sequence mapping:
+
+\begin{equation}
+t \mapsto D_t
+\end{equation}
+
+and does not guarantee surjectivity over the intended time domain, allowing gaps in the sequence.
+
+\subsection{Composite Failure of Integrity Invariants}
+
+The combined effect of these deficiencies can be expressed as the failure of a composite integrity condition. Define a telemetry system as valid if:
+
+\begin{equation}
+\text{Valid}(D_t) \iff 
+\begin{cases}
+\mathcal{E}(D_t) \text{ is deterministic} \\
+L_t = \mathcal{H}(\mathcal{E}(D_t) \concat L_{t-1}) \\
+\text{Verify}(L_t, \Sigma_t) = \text{true} \\
+D_t = \mathcal{G}(S_t)
+\end{cases}
+\end{equation}
+
+Existing systems violate one or more of these conditions, implying:
+
+\begin{equation}
+\exists t, \quad \text{Valid}(D_t) = \text{false}
+\end{equation}
+
+even when the system reports successful ingestion or verification.
+
+\subsection{Implications for System Behavior}
+
+The violation of these invariants leads to a breakdown in system reliability. From the analysis in the previous section, any inconsistency in telemetry acts as a perturbation $\delta_t$ that propagates through the system dynamics. The absence of deterministic encoding, lineage enforcement, and state binding implies that $\delta_t$ may be non-zero even in the absence of adversarial action.
+
+Consequently, the system exhibits non-reproducibility, as identical logical executions produce divergent trajectories. In adversarial scenarios, these vulnerabilities may be exploited to manipulate system behavior, inject false data, or conceal undesirable outcomes.
+
+Therefore, existing telemetry systems are fundamentally inadequate for feedback-coupled computational environments, as they fail to enforce the mathematical invariants necessary for deterministic and verifiable system evolution.
+
+\section{Engineering Requirements}
+
+The deficiencies identified in preceding sections establish that any telemetry system operating within a feedback-coupled computational environment must satisfy a set of strict mathematical invariants in order to ensure deterministic, stable, and verifiable system evolution. These invariants are not optional enhancements but necessary conditions derived from the structural properties of the system dynamics. The purpose of this section is to formalize these requirements as constraints on the telemetry processing pipeline, thereby defining the conditions under which Causative Telemetry Distortion is eliminated and reproducibility is guaranteed.
+
+Let the telemetry processing pipeline be defined as a composition of operators:
+
+\begin{equation}
+\mathcal{P} = \mathcal{V} \circ \mathcal{S} \circ \mathcal{C} \circ \mathcal{E}
+\end{equation}
+
+where $\mathcal{E}$ is the encoding operator, $\mathcal{C}$ is the cryptographic chaining operator, $\mathcal{S}$ is a proof generation operator, and $\mathcal{V}$ is a verification operator. The system is said to be integrity-preserving if and only if, for all telemetry inputs $D_t$, the pipeline satisfies:
+
+\begin{equation}
+\mathcal{V}(\mathcal{S}(\mathcal{C}(\mathcal{E}(D_t)))) = \text{true}
+\end{equation}
+
+and the resulting state evolution is invariant under semantically equivalent inputs.
+
+\subsection{Deterministic Representation Constraint}
+
+The first and most fundamental requirement is that the encoding operator $\mathcal{E}$ must be canonical. Formally, $\mathcal{E}$ must define a deterministic mapping:
+
+\begin{equation}
+\mathcal{E}: \mathcal{D} \rightarrow \{0,1\}^*
+\end{equation}
+
+such that:
+
+\begin{equation}
+\forall D_1, D_2 \in \mathcal{D}, \quad D_1 \equiv D_2 \implies \mathcal{E}(D_1) = \mathcal{E}(D_2)
+\end{equation}
+
+This property ensures that logical equivalence implies binary equivalence. In order to enforce this constraint, the encoding must eliminate all sources of non-determinism, including key ordering ambiguity and floating-point representation variability.
+
+Let $x \in \mathbb{R}$ be a numerical component of telemetry. Define a fixed-precision projection operator:
+
+\begin{equation}
+\Pi_k(x) = \lfloor x \cdot 10^k \rfloor
+\end{equation}
+
+for some precision parameter $k \in \mathbb{N}$. The encoding operator is then defined over the transformed space:
+
+\begin{equation}
+\mathcal{E}(D) = \text{Encode}(\Pi_k(D))
+\end{equation}
+
+where $\Pi_k(D)$ applies the projection component-wise. This ensures that:
+
+\begin{equation}
+\forall i,j, \quad \Pi_k^{(i)}(x) = \Pi_k^{(j)}(x)
+\end{equation}
+
+for all architectures $i,j$, thereby eliminating cross-platform discrepancies.
+
+\subsection{Immutable Lineage Constraint}
+
+The second requirement is that telemetry must be embedded within a cryptographically verifiable lineage structure. Define the lineage function:
+
+\begin{equation}
+L_t = \mathcal{H}(\mathcal{E}(D_t) \concat L_{t-1})
+\end{equation}
+
+with initial condition $L_0$ defined by a secure genesis value. This recursive construction ensures that the lineage forms a hash chain over the sequence $\{D_t\}$.
+
+The requirement of immutability can be expressed as the following invariant:
+
+\begin{equation}
+\forall k < t, \quad D_k' \neq D_k \implies L_t' \neq L_t
+\end{equation}
+
+This property follows from the collision resistance of $\mathcal{H}$ and guarantees that any modification to historical telemetry is detectable at the current state.
+
+Additionally, the lineage must enforce continuity:
+
+\begin{equation}
+t = t_{\text{prev}} + 1
+\end{equation}
+
+ensuring that the sequence is strictly ordered and complete.
+
+\subsection{State Provenance Binding Constraint}
+
+The third requirement is that telemetry must be cryptographically bound to the internal computational state from which it was generated. Let $\mathcal{G}$ denote the observation function such that:
+
+\begin{equation}
+D_t = \mathcal{G}(S_t)
+\end{equation}
+
+To enforce this relationship, the system must construct a proof $\Sigma_t$ that binds $L_t$ to a representation of $S_t$. Let $K$ denote a private key associated with the computational entity. Then:
+
+\begin{equation}
+\Sigma_t = \text{Sign}(L_t, K)
+\end{equation}
+
+The verification condition is:
+
+\begin{equation}
+\text{Verify}(L_t, \Sigma_t, PK) = \text{true}
+\end{equation}
+
+This ensures that the telemetry sequence is not only structurally valid but also originates from an authenticated source. To strengthen this constraint, the proof may incorporate a commitment to the internal state:
+
+\begin{equation}
+\Sigma_t = \text{Sign}(\mathcal{H}(S_t) \concat L_t, K)
+\end{equation}
+
+thereby binding telemetry to the actual system state.
+
+\subsection{Multi-Party Verification Constraint}
+
+To eliminate single points of failure, the system must employ a distributed verification mechanism. Let there be $n$ validators, each with a private key share $K_i$. Define partial signatures:
+
+\begin{equation}
+\sigma_i = \text{Sign}(L_t, K_i)
+\end{equation}
+
+An aggregate signature is constructed as:
+
+\begin{equation}
+\Sigma_t = \text{Aggregate}(\sigma_{i_1}, \dots, \sigma_{i_m})
+\end{equation}
+
+for some subset of validators $\{i_1, \dots, i_m\}$ with $m \geq t$, where $t$ is the threshold. The verification condition becomes:
+
+\begin{equation}
+\text{Verify}(L_t, \Sigma_t, PK) = \text{true}
+\end{equation}
+
+This ensures that no single compromised node can unilaterally validate telemetry.
+
+From a Byzantine fault tolerance perspective, the system tolerates up to $f < t$ faulty nodes, as an adversary must compromise at least $t$ validators to produce a valid signature.
+
+\subsection{Replay and Omission Resistance Constraint}
+
+The system must enforce strict sequence integrity. Let the telemetry sequence be indexed by $t \in \mathbb{N}$. Define a sequence mapping:
+
+\begin{equation}
+\psi: t \mapsto D_t
+\end{equation}
+
+The system must enforce injectivity and continuity:
+
+\begin{equation}
+t_1 \neq t_2 \implies D_{t_1} \neq D_{t_2}
+\end{equation}
+
+and:
+
+\begin{equation}
+\forall t > 0, \quad \exists D_{t-1}
+\end{equation}
+
+ensuring that no entries are replayed or omitted. This is enforced through the lineage function, as any discontinuity results in a mismatch in $L_t$.
+
+\subsection{Cross-Platform Consistency Constraint}
+
+Given a set of heterogeneous environments $\{(\mathcal{H}_i, \mathcal{R}_i)\}$, the encoding function must satisfy:
+
+\begin{equation}
+\forall i,j, \quad \mathcal{E}_{\mathcal{H}_i, \mathcal{R}_i}(D) = \mathcal{E}_{\mathcal{H}_j, \mathcal{R}_j}(D)
+\end{equation}
+
+This ensures that the system produces identical outputs regardless of execution environment.
+
+\subsection{Scalability Constraint}
+
+Finally, the system must maintain these invariants under high-throughput conditions. Let $\lambda$ denote the rate of telemetry generation. The system must satisfy:
+
+\begin{equation}
+\lim_{\lambda \to \infty} \text{Latency}(\mathcal{P}) < \infty
+\end{equation}
+
+while preserving correctness:
+
+\begin{equation}
+\forall D_t, \quad \text{Valid}(D_t) = \text{true}
+\end{equation}
+
+\subsection{Unified Integrity Condition}
+
+The above requirements may be consolidated into a single validity condition. A telemetry entry $D_t$ is valid if and only if:
+
+\begin{equation}
+\text{Valid}(D_t) \iff 
+\begin{cases}
+\mathcal{E}(D_t) \text{ is canonical} \\
+L_t = \mathcal{H}(\mathcal{E}(D_t) \concat L_{t-1}) \\
+\text{Verify}(L_t, \Sigma_t) = \text{true} \\
+D_t = \mathcal{G}(S_t)
+\end{cases}
+\end{equation}
+
+This condition defines the necessary and sufficient criteria for deterministic and verifiable telemetry in feedback-coupled systems.
+
+\subsection{Implications for System Design}
+
+The enforcement of these constraints transforms the telemetry pipeline from a passive logging mechanism into a formally verified computational subsystem. By ensuring deterministic representation, immutable lineage, and distributed verification, the system eliminates the perturbation channel $\delta_t$ identified in previous sections, thereby stabilizing the system dynamics and ensuring reproducibility.
+
+These requirements form the foundation for the architecture described in subsequent sections and define the core invariants that the disclosed RCO protocol is designed to satisfy.
+
+\section{Overview of the Disclosed Solution}
+
+The limitations of existing telemetry systems, when formalized as violations of deterministic encoding, lineage continuity, state binding, and distributed verification, necessitate the introduction of a unified framework that enforces these invariants as intrinsic properties of the system. The Feedback-Coupled Cryptographic Observation (RCO) Protocol constitutes such a framework, providing a mathematically grounded mechanism for ensuring that telemetry data functions as a deterministic, immutable, and verifiable component of system evolution.
+
+The RCO protocol may be interpreted as a transformation of the telemetry pipeline into a formally constrained computational operator. Let the pipeline be defined as a composition:
+
+\begin{equation}
+\mathcal{P}_{\text{RCO}} = \mathcal{V} \circ \mathcal{S} \circ \mathcal{C} \circ \mathcal{E}
+\end{equation}
+
+where $\mathcal{E}$ denotes canonical encoding, $\mathcal{C}$ denotes cryptographic chaining, $\mathcal{S}$ denotes proof generation, and $\mathcal{V}$ denotes verification. The defining property of the RCO protocol is that $\mathcal{P}_{\text{RCO}}$ enforces the validity condition:
+
+\begin{equation}
+\forall D_t \in \mathcal{D}, \quad \mathcal{P}_{\text{RCO}}(D_t) = \text{true} \iff \text{Valid}(D_t)
+\end{equation}
+
+where $\text{Valid}(D_t)$ is defined by the composite integrity condition introduced previously.
+
+The encoding operator $\mathcal{E}$ is constructed as a canonical mapping that eliminates all non-determinism in representation. Let $\Pi_k$ denote a fixed-precision projection operator. Then the encoding is defined as:
+
+\begin{equation}
+\mathcal{E}(D_t) = \text{Encode}(\Pi_k(D_t))
+\end{equation}
+
+where the encoding function enforces lexicographic ordering and fixed structural representation. This ensures that for any semantically equivalent telemetry elements $D_1$ and $D_2$:
+
+\begin{equation}
+D_1 \equiv D_2 \implies \mathcal{E}(D_1) = \mathcal{E}(D_2)
+\end{equation}
+
+thereby eliminating the perturbation term $\delta_t$ arising from representation inconsistencies.
+
+The chaining operator $\mathcal{C}$ constructs a lineage over telemetry entries by recursively applying a cryptographic hash function $\mathcal{H}$. Define:
+
+\begin{equation}
+L_t = \mathcal{H}(\mathcal{E}(D_t) \concat L_{t-1})
+\end{equation}
+
+This construction induces a directed acyclic structure over the sequence $\{D_t\}$, wherein each node depends on all prior nodes. The resulting lineage sequence $\{L_t\}$ satisfies the property:
+
+\begin{equation}
+\forall k < t, \quad D_k' \neq D_k \implies L_t' \neq L_t
+\end{equation}
+
+with overwhelming probability under the collision resistance assumption of $\mathcal{H}$. This ensures immutability and provides a mechanism for detecting any historical modification.
+
+The proof generation operator $\mathcal{S}$ constructs a cryptographic binding between the lineage and the originating computational state. Let $K$ denote a private key associated with the computational entity, and let $\mathcal{H}_S$ denote a state hashing function. The proof is defined as:
+
+\begin{equation}
+\Sigma_t = \text{Sign}(\mathcal{H}_S(S_t) \concat L_t, K)
+\end{equation}
+
+This formulation ensures that the proof incorporates both the lineage and a representation of the internal state, thereby enforcing state provenance. The verification operator $\mathcal{V}$ evaluates:
+
+\begin{equation}
+\mathcal{V}(L_t, \Sigma_t) = \text{Verify}(\mathcal{H}_S(S_t) \concat L_t, \Sigma_t, PK)
+\end{equation}
+
+ensuring that the telemetry is both authentic and consistent with the originating state.
+
+To eliminate single points of failure, the RCO protocol generalizes the proof generation mechanism to a distributed setting. Let there be a set of validators indexed by $i \in \{1, \dots, n\}$, each holding a key share $K_i$. Each validator produces a partial signature:
+
+\begin{equation}
+\sigma_i = \text{Sign}(L_t, K_i)
+\end{equation}
+
+An aggregate proof is constructed as:
+
+\begin{equation}
+\Sigma_t = \text{Aggregate}(\sigma_{i_1}, \dots, \sigma_{i_m})
+\end{equation}
+
+for a subset of validators satisfying $m \geq t$, where $t$ is a predefined threshold. The verification condition becomes:
+
+\begin{equation}
+\text{Verify}(L_t, \Sigma_t, PK) = \text{true}
+\end{equation}
+
+This construction ensures that the validation process is resilient to Byzantine faults, as an adversary must compromise at least $t$ independent validators to forge a valid proof.
+
+The RCO protocol further enforces sequence integrity through the implicit constraints of the lineage function. Given the recursive definition of $L_t$, any omission or reordering of telemetry entries results in a mismatch in the lineage sequence. Thus, the protocol enforces:
+
+\begin{equation}
+t = t_{\text{prev}} + 1
+\end{equation}
+
+as a necessary condition for acceptance, ensuring that the telemetry sequence is complete and strictly ordered.
+
+From a dynamical systems perspective, the RCO protocol eliminates the perturbation channel $\delta_t$ by enforcing:
+
+\begin{equation}
+\delta_t = 0 \quad \forall t
+\end{equation}
+
+under ideal conditions. Substituting into the divergence relation derived earlier:
+
+\begin{equation}
+\Delta_{t+1} \leq L_s \Delta_t
+\end{equation}
+
+which implies that if $L_s < 1$, the system converges, and if $L_s = 1$, the system remains stable. In either case, the absence of external perturbations ensures that the system evolution is determined solely by its initial conditions and actions.
+
+The protocol may also be interpreted as enforcing a constraint on the trajectory operator $\Phi$ such that:
+
+\begin{equation}
+\Phi(S_0, A, D) = \Phi(S_0, A, \mathcal{E}^{-1}(\mathcal{E}(D)))
+\end{equation}
+
+ensuring invariance under encoding. This property guarantees that the system behaves identically across executions, provided that the same logical telemetry is supplied.
+
+In summary, the RCO protocol transforms the telemetry pipeline into a formally verified subsystem that enforces deterministic representation, cryptographic continuity, and distributed validation. By integrating these components into a unified framework, the protocol eliminates the sources of distortion identified in previous sections and establishes a foundation for reproducible, tamper-evident, and verifiable computation in feedback-coupled systems.
+
+\section{System Architecture Overview}
+
+The Feedback-Coupled Cryptographic Observation (RCO) protocol may be rigorously characterized as a compositional system of operators acting over telemetry data and system state, wherein each operator enforces a distinct invariant required for deterministic and verifiable computation. Rather than treating the architecture as a collection of loosely coupled modules, the RCO protocol defines a mathematically structured pipeline in which each transformation is explicitly constrained and contributes to a globally consistent integrity condition.
+
+Let the telemetry processing architecture be defined as a sequence of transformations over an input telemetry element $D_t$ and system state $S_t$. The architecture may be expressed as a functional composition:
+
+\begin{equation}
+\mathcal{A}_{\text{RCO}} = \mathcal{V} \circ \mathcal{S} \circ \mathcal{C} \circ \mathcal{E}
+\end{equation}
+
+where each operator acts on the output of the preceding transformation. The domain and codomain of each operator are defined such that the composition is well-formed and deterministic.
+
+The encoding operator $\mathcal{E}: \mathcal{D} \rightarrow \{0,1\}^*$ maps telemetry data from its abstract representation into a canonical binary form. This operator is defined as a composition of a projection operator $\Pi_k$ and a structural encoding function:
+
+\begin{equation}
+\mathcal{E} = \text{Encode} \circ \Pi_k
+\end{equation}
+
+The projection operator $\Pi_k$ ensures numerical determinism by mapping real-valued inputs into a discrete lattice, while the encoding function enforces a unique ordering and representation of structured data. The output of $\mathcal{E}$ is a byte sequence that serves as the canonical representation of the telemetry element.
+
+The chaining operator $\mathcal{C}$ operates over the encoded telemetry and the previous lineage state. Let $L_{t-1} \in \{0,1\}^k$ denote the lineage at time $t-1$. Then:
+
+\begin{equation}
+\mathcal{C}(\mathcal{E}(D_t), L_{t-1}) = L_t = \mathcal{H}(\mathcal{E}(D_t) \concat L_{t-1})
+\end{equation}
+
+This operator defines a recursive dependency structure over the sequence $\{D_t\}$, effectively embedding the entire history of telemetry into the current lineage state. The chaining operator may be interpreted as constructing a path in a hash-induced state space, where each transition is uniquely determined by the current input and previous state.
+
+The proof generation operator $\mathcal{S}$ maps the lineage state into a cryptographic proof that binds the data to an originating computational entity. Let $\mathcal{K}$ denote the key space and $\mathcal{PK}$ the corresponding public key space. Then:
+
+\begin{equation}
+\mathcal{S}: \{0,1\}^k \times \mathcal{K} \rightarrow \Sigma
+\end{equation}
+
+where $\Sigma$ denotes the space of cryptographic proofs. The operator is defined as:
+
+\begin{equation}
+\Sigma_t = \mathcal{S}(L_t, K)
+\end{equation}
+
+In an extended formulation incorporating state binding, the operator may take the form:
+
+\begin{equation}
+\Sigma_t = \mathcal{S}(\mathcal{H}_S(S_t) \concat L_t, K)
+\end{equation}
+
+thereby coupling the lineage with a representation of the system state.
+
+The verification operator $\mathcal{V}$ evaluates the validity of the proof with respect to the lineage and public key. Formally:
+
+\begin{equation}
+\mathcal{V}: \{0,1\}^k \times \Sigma \times \mathcal{PK} \rightarrow \{\text{true}, \text{false}\}
+\end{equation}
+
+such that:
+
+\begin{equation}
+\mathcal{V}(L_t, \Sigma_t, PK) = \text{Verify}(L_t, \Sigma_t, PK)
+\end{equation}
+
+The composition of these operators yields a deterministic mapping from telemetry input to a binary acceptance decision.
+
+To analyze the architecture at a higher level, consider the system as a state machine operating over an augmented state space $\mathcal{X} = \mathcal{S} \times \mathcal{L}$, where $\mathcal{L}$ denotes the lineage space. The system evolves according to:
+
+\begin{equation}
+(S_{t+1}, L_t) = \Psi(S_t, L_{t-1}, A_t, D_t)
+\end{equation}
+
+where $\Psi$ incorporates both the computational transition $\mathcal{F}$ and the lineage update $\mathcal{C}$. This formulation reveals that the RCO protocol effectively augments the system state with a cryptographic memory that encodes the entire history of telemetry.
+
+The architecture may also be interpreted through the lens of category theory, wherein each operator defines a morphism between objects in a structured category. The composition $\mathcal{A}_{\text{RCO}}$ then defines a functor from the category of telemetry data to the category of verified states. The commutativity of the diagram:
+
+\begin{equation}
+\mathcal{V} \circ \mathcal{S} \circ \mathcal{C} \circ \mathcal{E} = \text{Valid}
+\end{equation}
+
+ensures that the outcome is invariant under equivalent transformations of the input.
+
+From an information-theoretic perspective, the lineage function $L_t$ may be viewed as a compression of the telemetry history into a fixed-length representation that preserves integrity information. Let $H(\cdot)$ denote entropy. Then:
+
+\begin{equation}
+H(L_t) \leq k
+\end{equation}
+
+while the effective information content of the history grows with $t$. The cryptographic properties of $\mathcal{H}$ ensure that this compression is collision-resistant, thereby preserving distinguishability between different histories.
+
+The architecture further supports parallelism and distribution. Let the system be partitioned into multiple nodes, each processing a subset of telemetry. The encoding and chaining operators are inherently local, while the proof generation and verification operators may be distributed across validator nodes. Define a set of validators $\mathcal{V}_i$ with local verification functions $\mathcal{V}_i$. The global verification condition is:
+
+\begin{equation}
+\bigwedge_{i=1}^{m} \mathcal{V}_i(L_t, \sigma_i, PK_i) = \text{true}
+\end{equation}
+
+for a sufficient subset of validators. This distributed structure enables scalability while preserving the integrity invariants.
+
+From a computational complexity standpoint, the cost of the pipeline is dominated by the hashing and signature operations. Let $T_{\mathcal{H}}$, $T_{\text{Sign}}$, and $T_{\text{Verify}}$ denote the time complexities of hashing, signing, and verification, respectively. Then the total cost per telemetry entry is:
+
+\begin{equation}
+T_{\text{total}} = T_{\mathcal{E}} + T_{\mathcal{H}} + m \cdot T_{\text{Sign}} + T_{\text{Verify}}
+\end{equation}
+
+where $m$ is the number of validators participating in the threshold scheme. The architecture is designed such that these operations can be parallelized, ensuring that throughput scales with available computational resources.
+
+Finally, the architecture enforces a global invariant over the system state:
+
+\begin{equation}
+\forall t, \quad \mathcal{V}(L_t, \Sigma_t) = \text{true} \implies (S_t, L_t) \text{ is valid}
+\end{equation}
+
+This invariant ensures that the system state and telemetry lineage remain synchronized and verifiable at all times.
+
+In summary, the RCO architecture defines a mathematically structured pipeline in which each operator enforces a specific integrity constraint, and the composition of these operators yields a system that is deterministic, immutable, and verifiable. By expressing the architecture in terms of functional composition and state augmentation, the protocol provides a rigorous foundation for the implementation of high-assurance telemetry systems in feedback-coupled computational environments.
+
+\section{Minimal Viable Integrity Model}
+
+While the full formulation of the RCO protocol enforces a comprehensive set of invariants including deterministic encoding, cryptographic lineage, state-bound proofs, and multi-party verification, it is neither necessary nor always practical for all deployment environments to implement the entirety of these mechanisms simultaneously. In order to facilitate incremental adoption and to accommodate systems with constrained computational or infrastructural resources, the RCO framework admits a reduced configuration, herein referred to as the Minimal Viable Integrity Model, which preserves the core guarantees required to eliminate undetected telemetry distortion while relaxing certain auxiliary constraints.
+
+The Minimal Viable Integrity Model may be derived by identifying the minimal subset of invariants necessary to ensure that the perturbation term $\delta_t$ introduced in previous sections is eliminated at the level of representation and temporal continuity. Formally, the goal is to enforce conditions under which:
+
+\begin{equation}
+\delta_t = 0 \quad \forall t
+\end{equation}
+
+with respect to the encoded telemetry stream, while tolerating reduced guarantees in provenance and distributed trust.
+
+Let the reduced telemetry pipeline be defined as:
+
+\begin{equation}
+\mathcal{P}_{\text{MVI}} = \mathcal{C} \circ \mathcal{E}
+\end{equation}
+
+where $\mathcal{E}$ is the canonical encoding operator and $\mathcal{C}$ is the cryptographic chaining operator. In this configuration, the proof generation and multi-party verification operators are omitted, resulting in a simplified pipeline that nevertheless enforces deterministic representation and immutable lineage.
+
+The encoding operator $\mathcal{E}$ retains its canonical properties as defined previously. That is:
+
+\begin{equation}
+\forall D_1, D_2 \in \mathcal{D}, \quad D_1 \equiv D_2 \implies \mathcal{E}(D_1) = \mathcal{E}(D_2)
+\end{equation}
+
+ensuring that the encoded telemetry is invariant under semantic equivalence. This property alone eliminates a significant class of perturbations arising from non-deterministic serialization and cross-platform discrepancies.
+
+The chaining operator $\mathcal{C}$ constructs the lineage sequence:
+
+\begin{equation}
+L_t = \mathcal{H}(\mathcal{E}(D_t) \concat L_{t-1})
+\end{equation}
+
+which enforces temporal integrity by embedding each telemetry element within a cryptographic dependency chain. The lineage sequence $\{L_t\}$ satisfies the property:
+
+\begin{equation}
+\forall k < t, \quad D_k' \neq D_k \implies L_t' \neq L_t
+\end{equation}
+
+with overwhelming probability. This ensures that any modification to historical telemetry is detectable at the current state, even in the absence of explicit proof verification.
+
+The Minimal Viable Integrity Model may be characterized by the following validity condition:
+
+\begin{equation}
+\text{Valid}_{\text{MVI}}(D_t) \iff L_t = \mathcal{H}(\mathcal{E}(D_t) \concat L_{t-1})
+\end{equation}
+
+This condition ensures that the telemetry sequence is both deterministically encoded and cryptographically chained, thereby preserving structural integrity and continuity.
+
+To analyze the effectiveness of this reduced model, consider the divergence relation derived earlier:
+
+\begin{equation}
+\Delta_{t+1} \leq L_s \Delta_t + L_d \|\delta_t\|
+\end{equation}
+
+Under the Minimal Viable Integrity Model, the encoding constraint ensures that $\delta_t = 0$ with respect to representation-induced perturbations. Therefore:
+
+\begin{equation}
+\Delta_{t+1} \leq L_s \Delta_t
+\end{equation}
+
+which implies that the system evolves deterministically with respect to telemetry inputs. Any divergence that remains is attributable solely to differences in initial conditions or actions, rather than inconsistencies in telemetry encoding.
+
+However, the absence of proof generation and verification introduces a residual vulnerability in the form of unverified provenance. In particular, while the lineage structure ensures that modifications are detectable, it does not guarantee that the data was generated by an authorized or legitimate computational entity. Let $\Sigma_t$ denote a hypothetical proof. In the Minimal Viable Integrity Model, no such proof is required, and therefore the condition:
+
+\begin{equation}
+\text{Verify}(L_t, \Sigma_t, PK) = \text{true}
+\end{equation}
+
+is not enforced. As a result, the system is susceptible to adversarial injection of telemetry that is structurally valid but semantically incorrect.
+
+To quantify this limitation, consider an adversary that generates a sequence $\{D_t'\}$ satisfying:
+
+\begin{equation}
+L_t' = \mathcal{H}(\mathcal{E}(D_t') \concat L_{t-1})
+\end{equation}
+
+Such a sequence will be accepted by the Minimal Viable Integrity Model, as it satisfies the chaining condition. However, there is no guarantee that $D_t'$ corresponds to any legitimate system state $S_t$. This highlights the distinction between structural integrity and semantic integrity, with the former being preserved in the minimal model and the latter requiring additional mechanisms.
+
+Despite this limitation, the Minimal Viable Integrity Model provides a significant improvement over conventional telemetry systems. By enforcing deterministic encoding and cryptographic chaining, it eliminates undetected modifications and ensures that the telemetry sequence is both consistent and auditable. In many practical scenarios, particularly those involving non-adversarial environments or internal system monitoring, these guarantees may be sufficient to achieve reliable operation.
+
+The Minimal Viable Integrity Model may also serve as a foundational layer upon which additional mechanisms are incrementally introduced. For example, the proof generation operator $\mathcal{S}$ may be incorporated to provide state binding, and the verification operator $\mathcal{V}$ may be extended to support multi-party validation. This layered approach allows systems to progressively enhance their security posture without requiring a complete redesign of the telemetry pipeline.
+
+From an implementation perspective, the computational cost of the minimal model is significantly lower than that of the full RCO protocol. Let $T_{\mathcal{E}}$ and $T_{\mathcal{H}}$ denote the time complexities of encoding and hashing, respectively. Then the total cost per telemetry entry is:
+
+\begin{equation}
+T_{\text{MVI}} = T_{\mathcal{E}} + T_{\mathcal{H}}
+\end{equation}
+
+which is substantially less than the cost of signature generation and verification in the full model. This makes the minimal model suitable for high-throughput environments or resource-constrained systems.
+
+Finally, the Minimal Viable Integrity Model satisfies a reduced invariant over the augmented state space:
+
+\begin{equation}
+\forall t, \quad L_t = \mathcal{H}(\mathcal{E}(D_t) \concat L_{t-1})
+\end{equation}
+
+which ensures that the lineage remains consistent and verifiable. While this invariant does not guarantee full security, it establishes a baseline level of integrity that is absent in conventional systems.
+
+In summary, the Minimal Viable Integrity Model represents a reduced configuration of the RCO protocol that preserves deterministic representation and immutable lineage while omitting advanced verification mechanisms. This model provides a practical entry point for adoption and serves as a foundation for progressively enhancing system integrity through the integration of additional components.
+
+\section{Scalability and Extensibility}
+
+The RCO protocol is designed not merely as a theoretically consistent framework for telemetry integrity, but as a system capable of operating under the practical constraints of high-throughput, distributed computational environments. In such environments, telemetry generation rates may be substantial, system components may be geographically distributed, and computational resources may be heterogeneous. The architecture must therefore satisfy scalability properties while preserving the integrity invariants defined in preceding sections.
+
+Let $\lambda$ denote the rate of telemetry generation, measured in units of telemetry elements per unit time. Let $\mathcal{P}_{\text{RCO}}$ denote the full processing pipeline, and let $T_{\mathcal{P}}$ denote the expected processing time per telemetry element. A necessary condition for scalability is that the system satisfies:
+
+\begin{equation}
+\lim_{\lambda \to \infty} \frac{T_{\mathcal{P}}}{1/\lambda} < \infty
+\end{equation}
+
+which ensures that the processing pipeline does not become a bottleneck as input rates increase. In practical terms, this condition requires that the pipeline be parallelizable and that its constituent operations admit efficient implementations.
+
+The encoding operator $\mathcal{E}$ is inherently parallelizable, as it operates independently on each telemetry element. Let $\mathcal{E}_i$ denote the encoding operation applied to the $i$-th telemetry element. Then:
+
+\begin{equation}
+\mathcal{E}(\{D_i\}_{i=1}^{N}) = \{\mathcal{E}_i(D_i)\}_{i=1}^{N}
+\end{equation}
+
+This independence allows encoding to be distributed across multiple processing units without introducing synchronization constraints.
+
+The chaining operator $\mathcal{C}$ introduces a sequential dependency due to its recursive definition:
+
+\begin{equation}
+L_t = \mathcal{H}(\mathcal{E}(D_t) \concat L_{t-1})
+\end{equation}
+
+However, this dependency is limited to a single scalar state $L_{t-1}$, allowing the computation to be pipelined. Let $T_{\mathcal{H}}$ denote the time required to compute the hash function. The throughput of the chaining operation is bounded by:
+
+\begin{equation}
+\text{Throughput}_{\mathcal{C}} \leq \frac{1}{T_{\mathcal{H}}}
+\end{equation}
+
+In practice, modern cryptographic hash functions admit highly optimized implementations, including hardware acceleration, which allows this bound to be sufficiently high for most applications.
+
+The proof generation and verification operators introduce additional computational overhead. Let $T_{\text{Sign}}$ and $T_{\text{Verify}}$ denote the time required for signature generation and verification, respectively. In a threshold setting with $m$ participating validators, the total cost per telemetry element is:
+
+\begin{equation}
+T_{\mathcal{S}, \mathcal{V}} = m \cdot T_{\text{Sign}} + T_{\text{Verify}}
+\end{equation}
+
+To ensure scalability, these operations must be distributed across validator nodes. Let the set of validators be partitioned across $p$ processing units. Then the effective cost per unit is:
+
+\begin{equation}
+T_{\text{per-unit}} = \frac{m}{p} \cdot T_{\text{Sign}} + \frac{1}{p} T_{\text{Verify}}
+\end{equation}
+
+which decreases as $p$ increases, assuming balanced load distribution.
+
+The overall pipeline throughput is therefore determined by the maximum of the individual operator costs:
+
+\begin{equation}
+\text{Throughput}_{\mathcal{P}} = \min \left( \frac{1}{T_{\mathcal{E}}}, \frac{1}{T_{\mathcal{H}}}, \frac{p}{m \cdot T_{\text{Sign}} + T_{\text{Verify}}} \right)
+\end{equation}
+
+This expression highlights the importance of parallelization and distributed processing in achieving scalability.
+
+From a distributed systems perspective, the RCO protocol may be modeled as a set of interacting processes $\{\mathcal{N}_i\}$, each responsible for a subset of telemetry processing tasks. Let $\mathcal{N}_i$ denote node $i$ with local state $(S_t^{(i)}, L_t^{(i)})$. The global system state is defined as the aggregation:
+
+\begin{equation}
+\mathcal{X}_t = \bigcup_{i} (S_t^{(i)}, L_t^{(i)})
+\end{equation}
+
+Consistency across nodes is maintained through synchronization of lineage states and validation of proofs. Let $\mathcal{C}_{ij}$ denote the communication channel between nodes $i$ and $j$. The system must satisfy:
+
+\begin{equation}
+L_t^{(i)} = L_t^{(j)} \quad \forall i,j
+\end{equation}
+
+for all accepted telemetry entries. This condition ensures that all nodes maintain a consistent view of the telemetry lineage.
+
+The communication overhead associated with maintaining this consistency may be expressed as:
+
+\begin{equation}
+C_{\text{comm}} = O(n \cdot k)
+\end{equation}
+
+where $n$ is the number of nodes and $k$ is the size of the lineage hash. This overhead is minimal relative to the size of the telemetry data itself, as only the lineage and proof information need to be transmitted.
+
+Extensibility of the RCO protocol is achieved through the modularity of its operator composition. Each operator $\mathcal{E}$, $\mathcal{C}$, $\mathcal{S}$, and $\mathcal{V}$ may be replaced or extended provided that the core invariants are preserved. Formally, let $\mathcal{E}'$, $\mathcal{C}'$, $\mathcal{S}'$, and $\mathcal{V}'$ denote alternative operators. The system remains valid if:
+
+\begin{equation}
+\mathcal{V}' \circ \mathcal{S}' \circ \mathcal{C}' \circ \mathcal{E}' = \text{Valid}
+\end{equation}
+
+This condition defines a class of equivalent implementations that satisfy the same integrity requirements.
+
+For example, the hash function $\mathcal{H}$ may be replaced with any function $\mathcal{H}'$ satisfying collision resistance:
+
+\begin{equation}
+\Pr[\mathcal{H}'(x) = \mathcal{H}'(y)] \leq \epsilon \quad \text{for } x \neq y
+\end{equation}
+
+Similarly, the signature scheme may be replaced with any scheme satisfying existential unforgeability under chosen-message attacks (EUF-CMA). Let $\Sigma'$ denote such a scheme. Then:
+
+\begin{equation}
+\Pr[\text{Forge}(\Sigma')] \leq \epsilon
+\end{equation}
+
+ensures that the security properties of the system are preserved.
+
+The protocol also supports hierarchical composition, wherein multiple RCO pipelines are composed to form a higher-level system. Let $\mathcal{P}_1$ and $\mathcal{P}_2$ denote two pipelines. Their composition:
+
+\begin{equation}
+\mathcal{P}_{\text{hier}} = \mathcal{P}_2 \circ \mathcal{P}_1
+\end{equation}
+
+remains valid provided that the output of $\mathcal{P}_1$ satisfies the input requirements of $\mathcal{P}_2$. This enables the construction of multi-layered systems with nested integrity guarantees.
+
+From an asymptotic perspective, the storage complexity of the lineage grows linearly with the number of telemetry entries:
+
+\begin{equation}
+\text{Storage}(t) = O(t \cdot k)
+\end{equation}
+
+However, the verification of integrity at any point requires only the current lineage hash and proof, resulting in constant-time verification:
+
+\begin{equation}
+T_{\text{verify}} = O(1)
+\end{equation}
+
+This property ensures that the system remains efficient even as the telemetry history grows.
+
+Finally, the scalability and extensibility of the RCO protocol may be summarized by the following invariant:
+
+\begin{equation}
+\forall \lambda, \quad \text{Valid}(D_t) \text{ is preserved under parallel, distributed, and extended implementations}
+\end{equation}
+
+This invariant ensures that the integrity guarantees of the protocol are maintained regardless of the scale or configuration of the system.
+
+In summary, the RCO protocol achieves scalability through parallelizable encoding, pipelined chaining, and distributed verification, while extensibility is ensured through the modularity of its operator composition. These properties enable the protocol to operate effectively in large-scale, heterogeneous environments without compromising its core integrity guarantees.
+
+\section{Industrial Applicability}
+
+The applicability of the Feedback-Coupled Cryptographic Observation (RCO) protocol extends to any computational domain in which telemetry data participates directly or indirectly in influencing system evolution, decision-making processes, or downstream analytical outcomes. The mathematical framework established in preceding sections demonstrates that the integrity of telemetry is not merely a matter of data correctness but a fundamental requirement for ensuring stability, reproducibility, and trustworthiness of system behavior. Consequently, any domain in which telemetry forms a feedback signal within a dynamical system is inherently susceptible to the distortions previously characterized and therefore stands to benefit from the enforcement of the invariants defined by the RCO protocol.
+
+To formalize this applicability, consider a general class of systems defined by a transition operator:
+
+\begin{equation}
+S_{t+1} = \mathcal{F}(S_t, A_t, D_t)
+\end{equation}
+
+where $D_t$ represents telemetry that influences subsequent computation. Let $\mathcal{C}_{\text{RCO}}$ denote the constraint set imposed by the RCO protocol. A system is said to be RCO-compliant if:
+
+\begin{equation}
+D_t \in \mathcal{C}_{\text{RCO}} \quad \forall t
+\end{equation}
+
+which implies that the telemetry satisfies deterministic encoding, cryptographic lineage, and verifiable provenance conditions. The impact of enforcing $\mathcal{C}_{\text{RCO}}$ may be analyzed by comparing system trajectories under constrained and unconstrained telemetry.
+
+Let $\{S_t\}$ denote the trajectory under unconstrained telemetry and $\{S_t^*\}$ the trajectory under RCO-compliant telemetry. From the perturbation model:
+
+\begin{equation}
+\Delta_t = \|S_t - S_t^*\|
+\end{equation}
+
+and:
+
+\begin{equation}
+\Delta_{t+1} \leq L_s \Delta_t + L_d \|\delta_t\|
+\end{equation}
+
+Under RCO enforcement, $\delta_t = 0$, yielding:
+
+\begin{equation}
+\Delta_{t+1} \leq L_s \Delta_t
+\end{equation}
+
+which implies that system behavior is governed solely by initial conditions and control inputs, thereby ensuring reproducibility and stability. This result is domain-agnostic and applies to any system in which telemetry acts as a feedback variable.
+
+In the context of reinforcement learning systems, the state $S_t$ may represent the parameters of a policy or value function, while $D_t$ corresponds to observed rewards, transitions, or gradients. The update rule may be expressed as:
+
+\begin{equation}
+\theta_{t+1} = \theta_t + \alpha \cdot \nabla J(\theta_t, D_t)
+\end{equation}
+
+where $\theta_t$ denotes model parameters and $J$ is an objective function. Any inconsistency in $D_t$ directly affects the gradient computation, resulting in divergence of the training trajectory. Under RCO constraints, the deterministic encoding and lineage verification of $D_t$ ensure that the gradient updates are reproducible, enabling consistent training outcomes across distributed environments.
+
+In financial systems, telemetry may represent market data, transaction logs, or risk indicators that influence trading strategies or risk models. Let $S_t$ denote the state of a trading system and $D_t$ the incoming market data. The decision function may be expressed as:
+
+\begin{equation}
+A_t = \pi(S_t, D_t)
+\end{equation}
+
+where $\pi$ is a policy function. In such systems, even minor discrepancies in $D_t$ can lead to divergent trading decisions with significant financial implications. The enforcement of deterministic and verifiable telemetry ensures that decisions are based on consistent data, thereby reducing the risk of unintended behavior and enabling auditability.
+
+In scientific computing and simulation environments, telemetry often represents intermediate results, boundary conditions, or measurement data that influence subsequent computations. Let the system be defined by a numerical solver:
+
+\begin{equation}
+S_{t+1} = \mathcal{F}(S_t, D_t)
+\end{equation}
+
+where $D_t$ may include discretized inputs or observational constraints. Non-deterministic representation of $D_t$ leads to divergence in simulation outcomes, undermining reproducibility. By enforcing canonical encoding and lineage tracking, the RCO protocol ensures that simulation results can be independently verified and reproduced.
+
+In autonomous systems and robotics, telemetry includes sensor data, environmental observations, and internal diagnostics that influence control decisions. Let $S_t$ represent the state of the system and $D_t$ the sensor input. The control law may be expressed as:
+
+\begin{equation}
+A_t = \mathcal{K}(S_t, D_t)
+\end{equation}
+
+where $\mathcal{K}$ is a control function. In such systems, inconsistencies in telemetry may lead to unsafe or unpredictable behavior. The RCO protocol ensures that sensor data is processed deterministically and that its integrity is verifiable, thereby enhancing safety and reliability.
+
+In distributed control systems and cyber-physical infrastructures, multiple nodes interact through shared telemetry streams. Let $\mathcal{N}_i$ denote node $i$ with local state $S_t^{(i)}$ and telemetry $D_t^{(i)}$. The global system behavior depends on the aggregation:
+
+\begin{equation}
+S_{t+1}^{(i)} = \mathcal{F}_i(S_t^{(i)}, D_t^{(i)}, \{D_t^{(j)}\}_{j \neq i})
+\end{equation}
+
+In such systems, inconsistencies in telemetry across nodes lead to divergence in local states and potential system instability. The RCO protocol enforces a consistent lineage across nodes:
+
+\begin{equation}
+L_t^{(i)} = L_t^{(j)} \quad \forall i,j
+\end{equation}
+
+ensuring that all nodes operate on a shared and verifiable history.
+
+From a regulatory and compliance perspective, the ability to provide audit-grade verification of system behavior is increasingly critical. Let $\mathcal{A}$ denote an audit function that reconstructs system history from telemetry. Under conventional systems, $\mathcal{A}$ may produce ambiguous or unverifiable results due to inconsistencies in data. Under RCO enforcement:
+
+\begin{equation}
+\mathcal{A}(\{D_t\}, \{L_t\}, \{\Sigma_t\}) = \text{Verified History}
+\end{equation}
+
+where the lineage and proofs provide cryptographic guarantees of integrity. This enables independent verification of system behavior and supports compliance with regulatory requirements.
+
+The applicability of the RCO protocol may therefore be characterized by the condition:
+
+\begin{equation}
+\exists \mathcal{F} \text{ such that } \frac{\partial S_{t+1}}{\partial D_t} \neq 0
+\end{equation}
+
+which indicates that telemetry influences system evolution. For any such system, the enforcement of RCO constraints eliminates the perturbation channel and ensures deterministic behavior.
+
+In summary, the RCO protocol is applicable to a broad class of computational systems in which telemetry participates in feedback-driven processes. By enforcing deterministic representation, cryptographic lineage, and verifiable provenance, the protocol ensures stability, reproducibility, and auditability across domains including machine learning, finance, scientific computing, autonomous systems, and distributed control infrastructures. The mathematical framework presented herein demonstrates that these benefits arise directly from the elimination of telemetry-induced perturbations and the enforcement of integrity invariants, establishing the RCO protocol as a foundational component for high-assurance computational systems.
+
+\section{Summary of Contribution}
+
+The present disclosure introduces a unified mathematical and architectural framework for ensuring deterministic, verifiable, and tamper-evident telemetry in feedback-coupled computational systems. The necessity of such a framework arises from the structural dependence of system evolution on telemetry data, as formalized by the transition relation:
+
+\begin{equation}
+S_{t+1} = \mathcal{F}(S_t, A_t, D_t)
+\end{equation}
+
+where the sensitivity condition:
+
+\begin{equation}
+\frac{\partial S_{t+1}}{\partial D_t} \neq 0
+\end{equation}
+
+implies that any perturbation in telemetry propagates directly into system behavior. Existing systems fail to control this perturbation channel, resulting in the emergence of Causative Telemetry Distortion, characterized by the divergence relation:
+
+\begin{equation}
+\Delta_{t+1} \leq L_s \Delta_t + L_d \|\delta_t\|
+\end{equation}
+
+where $\delta_t$ represents inconsistencies in telemetry representation or transmission. The absence of deterministic encoding, lineage enforcement, and verifiable provenance in conventional systems ensures that $\delta_t \neq 0$ in general, leading to instability and non-reproducibility.
+
+The disclosed RCO protocol eliminates this perturbation channel by enforcing a set of mathematical invariants over the telemetry pipeline. These invariants are realized through a compositional architecture defined by the operator:
+
+\begin{equation}
+\mathcal{A}_{\text{RCO}} = \mathcal{V} \circ \mathcal{S} \circ \mathcal{C} \circ \mathcal{E}
+\end{equation}
+
+where each operator enforces a specific constraint necessary for integrity preservation. The encoding operator $\mathcal{E}$ ensures canonical representation, satisfying:
+
+\begin{equation}
+D_1 \equiv D_2 \implies \mathcal{E}(D_1) = \mathcal{E}(D_2)
+\end{equation}
+
+thereby eliminating representation-induced perturbations. The chaining operator $\mathcal{C}$ constructs an immutable lineage:
+
+\begin{equation}
+L_t = \mathcal{H}(\mathcal{E}(D_t) \concat L_{t-1})
+\end{equation}
+
+which ensures that any modification to historical telemetry is detectable. The proof generation operator $\mathcal{S}$ binds the lineage to the originating computational state:
+
+\begin{equation}
+\Sigma_t = \text{Sign}(\mathcal{H}_S(S_t) \concat L_t, K)
+\end{equation}
+
+while the verification operator $\mathcal{V}$ enforces authenticity and correctness through cryptographic validation.
+
+The combined effect of these operators is to enforce the condition:
+
+\begin{equation}
+\delta_t = 0 \quad \forall t
+\end{equation}
+
+with respect to telemetry-induced perturbations, yielding a reduced divergence relation:
+
+\begin{equation}
+\Delta_{t+1} \leq L_s \Delta_t
+\end{equation}
+
+which ensures deterministic and stable system evolution.
+
+A key contribution of the present disclosure lies in the formalization of telemetry as a causative variable within system dynamics and the identification of deterministic representation and cryptographic lineage as necessary conditions for stability. This contrasts with existing approaches that treat telemetry as an auxiliary artifact and fail to enforce invariants at the level of system evolution.
+
+Another contribution is the introduction of a unified validity condition that integrates encoding, lineage, and verification into a single criterion:
+
+\begin{equation}
+\text{Valid}(D_t) \iff 
+\begin{cases}
+\mathcal{E}(D_t) \text{ is canonical} \\
+L_t = \mathcal{H}(\mathcal{E}(D_t) \concat L_{t-1}) \\
+\text{Verify}(L_t, \Sigma_t) = \text{true} \\
+D_t = \mathcal{G}(S_t)
+\end{cases}
+\end{equation}
+
+This condition defines the necessary and sufficient requirements for telemetry integrity in feedback-coupled systems and provides a basis for formal verification.
+
+The disclosure further introduces a Minimal Viable Integrity Model defined by the reduced pipeline:
+
+\begin{equation}
+\mathcal{P}_{\text{MVI}} = \mathcal{C} \circ \mathcal{E}
+\end{equation}
+
+which preserves deterministic representation and immutable lineage while relaxing provenance constraints. This model enables incremental adoption and broadens the applicability of the protocol across diverse system environments.
+
+From an architectural perspective, the RCO protocol defines a modular and extensible system in which each operator may be independently implemented or replaced, provided that the core invariants are preserved. This modularity is captured by the equivalence condition:
+
+\begin{equation}
+\mathcal{V}' \circ \mathcal{S}' \circ \mathcal{C}' \circ \mathcal{E}' = \text{Valid}
+\end{equation}
+
+which defines a class of implementations satisfying the same integrity guarantees.
+
+The disclosure also establishes the scalability of the protocol through parallelizable encoding, pipelined chaining, and distributed verification, ensuring that the system can operate under high-throughput conditions without compromising correctness. The distributed validation mechanism provides resilience against Byzantine faults, requiring a threshold of independent validators to authorize telemetry.
+
+In addition to its theoretical contributions, the RCO protocol provides practical benefits across a wide range of domains, including machine learning, financial systems, scientific computing, and autonomous control. In each of these domains, the enforcement of deterministic and verifiable telemetry eliminates sources of instability and enables reproducible and auditable system behavior.
+
+The novelty of the present disclosure resides in the integration of deterministic serialization, cryptographic lineage construction, and feedback-aware validation into a single unified framework that directly addresses the causal role of telemetry in system dynamics. Unlike prior systems that address these aspects in isolation or not at all, the RCO protocol provides a comprehensive solution that enforces integrity at the level of system evolution.
+
+In summary, the present disclosure establishes a new paradigm for telemetry integrity in feedback-coupled computational systems by formalizing the role of telemetry as a causative variable, identifying the invariants required for stability, and providing a scalable and extensible architecture for enforcing these invariants. This paradigm enables the construction of systems that are deterministic, verifiable, and resistant to adversarial manipulation, thereby addressing a fundamental limitation of existing computational infrastructures.

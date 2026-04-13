@@ -1,0 +1,249 @@
+\section{Overview}
+
+This appendix defines the constants, configuration parameters, and operational bounds governing the RCO protocol. These parameters determine the security guarantees, performance characteristics, and deployment constraints of the system.
+
+The values presented here are not arbitrary. Each parameter is tied to a specific requirement in the protocol, including cryptographic security, fault tolerance, and system scalability.
+
+\section{Notation}
+
+Let:
+
+\begin{itemize}
+\item $n$ denote the total number of validator nodes,
+\item $t$ denote the threshold required for signature aggregation,
+\item $f$ denote the maximum number of faulty or adversarial validators,
+\item $\lambda$ denote the security parameter,
+\item $|H|$ denote hash output length,
+\item $|K|$ denote key size.
+\end{itemize}
+
+\section{Validator Threshold Parameters}
+
+The protocol enforces the constraint:
+
+\begin{equation}
+f < t \leq n
+\end{equation}
+
+For Byzantine resilience, the recommended configuration is:
+
+\begin{equation}
+t = \left\lfloor \frac{2n}{3} \right\rfloor + 1
+\end{equation}
+
+This ensures that the system remains secure as long as fewer than one-third of validators are compromised.
+
+\section{Cryptographic Security Parameter}
+
+The security parameter $\lambda$ determines the strength of cryptographic primitives.
+
+Typical values include:
+
+\begin{itemize}
+\item $\lambda = 128$ (minimum recommended),
+\item $\lambda = 192$ (high security),
+\item $\lambda = 256$ (long-term security).
+\end{itemize}
+
+\section{Hash Function Parameters}
+
+The protocol requires a collision-resistant hash function with output length:
+
+\begin{equation}
+|H| \geq 256 \text{ bits}
+\end{equation}
+
+This ensures that the probability of collision is negligible:
+
+\begin{equation}
+\Pr[\text{collision}] \approx 2^{-|H|}
+\end{equation}
+
+\section{Signature Scheme Parameters}
+
+The protocol assumes a signature scheme with:
+
+\begin{itemize}
+\item existential unforgeability under chosen-message attacks (EUF-CMA),
+\item key size $|K| \geq 256$ bits (for elliptic curve schemes),
+\item efficient aggregation support (optional but recommended).
+\end{itemize}
+
+\section{Lineage Initialization}
+
+The initial lineage value $L_0$ is defined as:
+
+\begin{equation}
+L_0 = \mathcal{H}(\text{``genesis''})
+\end{equation}
+
+This value must be fixed and globally agreed upon to ensure consistency across nodes.
+
+\section{Timeout Parameters}
+
+Define:
+
+\begin{itemize}
+\item $T_{\text{sign}}$: maximum time to wait for validator signatures,
+\item $T_{\text{agg}}$: maximum time for aggregation,
+\item $T_{\text{total}}$: total allowed processing time.
+\end{itemize}
+
+These satisfy:
+
+\begin{equation}
+T_{\text{total}} = T_{\text{sign}} + T_{\text{agg}} + T_{\text{network}}
+\end{equation}
+
+Typical values:
+
+\begin{itemize}
+\item $T_{\text{sign}} = 50$–$200$ ms (cloud),
+\item $T_{\text{sign}} = 200$–$1000$ ms (edge),
+\item $T_{\text{agg}} = 10$–$50$ ms.
+\end{itemize}
+
+\section{Batch Size Parameter}
+
+Let $B$ denote batch size.
+
+\begin{equation}
+1 \leq B \leq B_{\max}
+\end{equation}
+
+Larger $B$ improves throughput but increases latency.
+
+Recommended:
+
+\begin{itemize}
+\item $B = 1$ (low latency),
+\item $B = 10$–$100$ (balanced),
+\item $B > 100$ (high throughput systems).
+\end{itemize}
+
+\section{Storage Parameters}
+
+Let:
+
+\begin{itemize}
+\item $S_{\text{entry}}$ denote size per log entry,
+\item $N$ denote number of entries.
+\end{itemize}
+
+Total storage:
+
+\begin{equation}
+S_{\text{total}} = N \cdot S_{\text{entry}}
+\end{equation}
+
+Checkpointing interval $k$ reduces storage:
+
+\begin{equation}
+S_{\text{effective}} \approx \frac{N}{k}
+\end{equation}
+
+\section{Network Parameters}
+
+Bandwidth requirement:
+
+\begin{equation}
+BW \propto t \cdot |M_t|
+\end{equation}
+
+Optimization:
+
+\begin{itemize}
+\item transmit hashes instead of raw data,
+\item compress signatures where possible.
+\end{itemize}
+
+\section{Fault Tolerance Bounds}
+
+The system remains secure if:
+
+\begin{equation}
+f < t
+\end{equation}
+
+and available if:
+
+\begin{equation}
+n - f \geq t
+\end{equation}
+
+\section{Probability Bounds}
+
+Overall failure probability:
+
+\begin{equation}
+\epsilon_{\text{total}} = \epsilon_{\text{sig}} + \epsilon_{\mathcal{H}} + \epsilon_{\text{threshold}}
+\end{equation}
+
+Each component must be negligible.
+
+\section{Scaling Parameters}
+
+Let:
+
+\begin{itemize}
+\item $\lambda_{\text{in}}$ = input rate,
+\item $\lambda_{\text{proc}}$ = processing rate.
+\end{itemize}
+
+System stability requires:
+
+\begin{equation}
+\lambda_{\text{in}} \leq \lambda_{\text{proc}}
+\end{equation}
+
+\section{Parameter Trade-Offs}
+
+The system exhibits trade-offs between:
+
+\begin{itemize}
+\item security vs performance (higher $t$ increases security but adds latency),
+\item throughput vs latency (larger batches increase throughput),
+\item fault tolerance vs resource usage (more validators increase cost).
+\end{itemize}
+
+\section{Recommended Configurations}
+
+\subsection{Cloud Deployment}
+
+\begin{itemize}
+\item $n = 5$–$10$,
+\item $t = \lfloor 2n/3 \rfloor + 1$,
+\item low latency configuration,
+\item moderate batch size.
+\end{itemize}
+
+\subsection{Edge Deployment}
+
+\begin{itemize}
+\item $n = 3$–$7$,
+\item higher timeout values,
+\item smaller batch size,
+\item local preprocessing enabled.
+\end{itemize}
+
+\subsection{Hybrid Deployment}
+
+\begin{itemize}
+\item edge: preprocessing,
+\item cloud: aggregation and verification,
+\item dynamic scaling of validators.
+\end{itemize}
+
+\section{Security Margins}
+
+To ensure long-term security:
+
+\begin{itemize}
+\item use $\lambda \geq 256$ for critical systems,
+\item rotate keys periodically,
+\item maintain validator diversity.
+\end{itemize}
+
+\section{Conclusion}
+
+This appendix defines the operational parameters of the RCO protocol and establishes the constraints under which it operates securely and efficiently. By explicitly specifying these constants, the protocol becomes reproducible, tunable, and deployable across a wide range of environments while maintaining its core guarantees.
