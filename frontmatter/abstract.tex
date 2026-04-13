@@ -1,0 +1,9 @@
+\chapter*{Abstract}
+
+The present disclosure describes a system and method for ensuring deterministic integrity and verifiable lineage in feedback-coupled computational environments, particularly within agentic and machine learning systems where telemetry influences internal model evolution. Traditional telemetry pipelines lack guarantees of immutability, cross-platform determinism, and resistance to adversarial manipulation, resulting in inconsistent or unverifiable system states.
+
+The disclosed Feedback-Coupled Cryptographic Observation (RCO) protocol introduces a cryptographic framework that binds telemetry data to its originating computational state through deterministic serialization, chained hashing, and verifiable proof mechanisms. In one embodiment, telemetry batches are encoded using a canonical serialization scheme with fixed-precision normalization to eliminate numerical drift across heterogeneous architectures. Each batch is linked to a prior state using a cryptographic hash chain, thereby establishing an immutable lineage.
+
+The system further incorporates a multi-party validation mechanism requiring a threshold of independent signatures to authorize ingestion, preventing unilateral data injection and mitigating single-point compromise. Additional embodiments include scalable ingestion pipelines, zero-trust communication models, and optional analytical layers for anomaly detection.
+
+The disclosed approach enables reproducible, tamper-evident, and audit-grade telemetry across distributed systems, improving the reliability of feedback-driven computational processes and supporting high-assurance environments such as large-scale simulations, reinforcement learning systems, and autonomous decision frameworks.

@@ -1,0 +1,166 @@
+% ==============================
+% GLOBAL SPACING & TYPOGRAPHY
+% ==============================
+
+\onehalfspacing
+\setlength{\parskip}{6pt}
+\setlength{\parindent}{0pt}
+
+% ==============================
+% SECTION & CHAPTER FORMATTING
+% ==============================
+
+\titleformat{\chapter}
+  {\normalfont\huge\bfseries}
+  {\thechapter.}{1em}{}
+
+\titleformat{\section}
+  {\normalfont\Large\bfseries}
+  {\thesection}{1em}{}
+
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}
+  {\thesubsection}{1em}{}
+
+\titleformat{\subsubsection}
+  {\normalfont\normalsize\bfseries}
+  {\thesubsubsection}{1em}{}
+
+% Reduce excessive whitespace before/after titles
+\titlespacing*{\chapter}{0pt}{-10pt}{20pt}
+\titlespacing*{\section}{0pt}{12pt}{6pt}
+\titlespacing*{\subsection}{0pt}{10pt}{4pt}
+
+% ==============================
+% HEADER / FOOTER (PATENT STYLE)
+% ==============================
+
+\pagestyle{fancy}
+\fancyhf{}
+
+\fancyhead[L]{RCO Protocol Specification}
+\fancyhead[R]{Technical Patent Draft}
+\fancyfoot[C]{\thepage}
+
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% ==============================
+% TABLE OF CONTENTS FORMATTING
+% ==============================
+
+\setlength{\cftbeforechapskip}{6pt}
+\setlength{\cftbeforesecskip}{2pt}
+
+\renewcommand{\cftchapfont}{\bfseries}
+\renewcommand{\cftsecfont}{}
+
+% ==============================
+% HYPERLINK SETTINGS
+% ==============================
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue,
+    pdftitle={RCO Protocol Patent Documentation},
+    pdfauthor={Mohit Ranjan, Dr. Ram Chandra Barik}
+}
+
+% ==============================
+% THEOREM ENVIRONMENTS (CRITICAL)
+% ==============================
+
+\newtheorem{theorem}{Theorem}[chapter]
+\newtheorem{lemma}{Lemma}[chapter]
+\newtheorem{proposition}{Proposition}[chapter]
+\newtheorem{corollary}{Corollary}[chapter]
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[chapter]
+\newtheorem{assumption}{Assumption}[chapter]
+
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}[chapter]
+
+% ==============================
+% CUSTOM BOX ENVIRONMENTS
+% ==============================
+
+\usepackage{tcolorbox}
+
+\tcbset{
+    colback=white,
+    colframe=black,
+    boxrule=0.5pt,
+    arc=2pt,
+    left=6pt,
+    right=6pt,
+    top=6pt,
+    bottom=6pt
+}
+
+\newtcolorbox{importantbox}{
+    colback=gray!5,
+    colframe=black,
+    title=Important,
+    fonttitle=\bfseries
+}
+
+\newtcolorbox{claimbox}{
+    colback=white,
+    colframe=black,
+    title=Claim,
+    fonttitle=\bfseries
+}
+
+% ==============================
+% LIST FORMATTING
+% ==============================
+
+\setlist[itemize]{topsep=4pt, itemsep=2pt}
+\setlist[enumerate]{topsep=4pt, itemsep=2pt}
+
+% ==============================
+% FIGURE & TABLE FORMATTING
+% ==============================
+
+\captionsetup{
+    font=small,
+    labelfont=bf
+}
+
+\setlength{\textfloatsep}{10pt}
+\setlength{\floatsep}{8pt}
+
+% ==============================
+% EQUATION FORMATTING
+% ==============================
+
+\numberwithin{equation}{chapter}
+
+% ==============================
+% CODE BLOCK TITLES
+% ==============================
+
+\renewcommand{\lstlistingname}{Code Snippet}
+
+% ==============================
+% APPENDIX FORMAT
+% ==============================
+
+\renewcommand{\appendixname}{Appendix}
+\renewcommand{\thechapter}{\Alph{chapter}}
+
+% ==============================
+% PATENT CLAIM NUMBERING
+% ==============================
+
+\newcounter{claim}
+\setcounter{claim}{0}
+
+\newcommand{\claim}[1]{
+    \refstepcounter{claim}
+    \noindent\textbf{Claim \theclaim.} #1 \par
+}

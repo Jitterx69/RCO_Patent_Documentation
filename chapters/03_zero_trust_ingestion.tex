@@ -1,0 +1,750 @@
+\section{Overview}
+
+The ingestion phase of the Feedback-Coupled Cryptographic Observation (RCO) protocol constitutes the boundary at which externally generated telemetry is admitted into the cryptographically secured lineage. Unlike traditional ingestion mechanisms that rely on implicit trust in data producers or centralized validation authorities, the RCO protocol adopts a zero-trust model in which every telemetry element is treated as potentially adversarial until it satisfies a formally defined set of verification conditions.
+
+Let $\mathcal{D}$ denote the space of telemetry inputs and $\mathcal{I}$ the ingestion operator. The ingestion process defines a mapping:
+
+\begin{equation}
+\mathcal{I}: \mathcal{D} \times \mathcal{L} \rightarrow \{\text{accept}, \text{reject}\}
+\end{equation}
+
+where $\mathcal{L}$ denotes the lineage state. The operator $\mathcal{I}$ must enforce that only telemetry satisfying the global integrity condition defined in the cryptographic core is admitted into the system.
+
+Formally, the ingestion operator must satisfy:
+
+\begin{equation}
+\mathcal{I}(D_t, L_{t-1}) = \text{accept} \iff \text{Valid}(D_t)
+\end{equation}
+
+where $\text{Valid}(D_t)$ is the composite condition defined in Section 02.
+
+\section{Adversarial Model}
+
+The zero-trust ingestion framework is designed under a strong adversarial model in which multiple components of the system may be compromised. Let $\mathcal{A}$ denote an adversary with the following capabilities:
+
+\begin{equation}
+\mathcal{A} = (\mathcal{A}_{\text{inject}}, \mathcal{A}_{\text{modify}}, \mathcal{A}_{\text{replay}}, \mathcal{A}_{\text{collude}})
+\end{equation}
+
+where each component represents a class of attacks.
+
+The injection capability allows the adversary to generate arbitrary telemetry $D_t'$:
+
+\begin{equation}
+D_t' \in \mathcal{D}
+\end{equation}
+
+The modification capability allows alteration of in-transit data:
+
+\begin{equation}
+D_t' = D_t + \delta_t
+\end{equation}
+
+The replay capability allows reuse of previously valid telemetry:
+
+\begin{equation}
+D_t' = D_k \quad \text{for } k < t
+\end{equation}
+
+The collusion capability allows multiple compromised nodes to coordinate their actions.
+
+The goal of the adversary is to produce a telemetry element $D_t'$ such that:
+
+\begin{equation}
+\mathcal{I}(D_t', L_{t-1}) = \text{accept} \quad \text{and} \quad D_t' \not\equiv D_t
+\end{equation}
+
+That is, to inject invalid telemetry that passes validation.
+
+\section{Zero-Trust Principle}
+
+The ingestion framework enforces the principle that no entity is inherently trusted. Let $\mathcal{N}$ denote the set of nodes in the system. In a zero-trust model:
+
+\begin{equation}
+\forall i \in \mathcal{N}, \quad \text{Trust}(i) = 0
+\end{equation}
+
+Trust is replaced by verification, such that acceptance is determined solely by the satisfaction of cryptographic and structural conditions.
+
+This principle may be formalized as:
+
+\begin{equation}
+\mathcal{I}(D_t, L_{t-1}) = \text{accept} \iff \mathcal{V}_{\text{global}}(D_t, L_{t-1}) = \text{true}
+\end{equation}
+
+independent of the origin of $D_t$.
+
+\section{Multi-Party Verification Model}
+
+To eliminate single points of failure, the ingestion process employs a distributed verification model involving a set of validator nodes. Let $\mathcal{V} = \{V_1, V_2, \dots, V_n\}$ denote the set of validators.
+
+Each validator $V_i$ implements a local verification function:
+
+\begin{equation}
+\mathcal{V}_i: \mathcal{D} \times \mathcal{L} \rightarrow \{\text{true}, \text{false}\}
+\end{equation}
+
+The global verification condition is defined as a threshold function:
+
+\begin{equation}
+\mathcal{V}_{\text{global}}(D_t, L_{t-1}) = 
+\begin{cases}
+\text{true}, & \sum_{i=1}^{n} \mathbb{I}[\mathcal{V}_i(D_t, L_{t-1}) = \text{true}] \geq t \\
+\text{false}, & \text{otherwise}
+\end{cases}
+\end{equation}
+
+where $t$ is the acceptance threshold and $\mathbb{I}$ is the indicator function.
+
+\section{Correctness of Threshold Verification}
+
+The threshold verification mechanism ensures that telemetry is accepted only if a sufficient number of independent validators agree on its validity.
+
+\begin{theorem}[Threshold Correctness]
+If at least $t$ validators are honest and correctly implement the verification function, then any invalid telemetry $D_t'$ is rejected with overwhelming probability.
+\end{theorem}
+
+\begin{proof}
+Let $\mathcal{H}$ denote the set of honest validators and assume $|\mathcal{H}| \geq t$. For invalid telemetry $D_t'$, each honest validator evaluates:
+
+\[
+\mathcal{V}_i(D_t', L_{t-1}) = \text{false}
+\]
+
+since $D_t'$ does not satisfy the validity condition. Therefore:
+
+\[
+\sum_{i=1}^{n} \mathbb{I}[\mathcal{V}_i(D_t', L_{t-1}) = \text{true}] \leq n - |\mathcal{H}| < t
+\]
+
+Thus, $\mathcal{V}_{\text{global}}(D_t', L_{t-1}) = \text{false}$, and the telemetry is rejected.
+\end{proof}
+
+\section{Byzantine Fault Model}
+
+The system operates under a Byzantine fault model in which up to $f$ validators may be malicious. The threshold $t$ must satisfy:
+
+\begin{equation}
+t > f
+\end{equation}
+
+to ensure that malicious validators cannot unilaterally accept invalid telemetry.
+
+In the presence of collusion, the adversary controls a subset $\mathcal{C} \subseteq \mathcal{V}$ with $|\mathcal{C}| = f$. The adversary succeeds only if:
+
+\begin{equation}
+f \geq t
+\end{equation}
+
+which is prevented by the threshold condition.
+
+\section{Ingestion State Transition}
+
+The ingestion process updates the lineage state upon acceptance of telemetry. Let the system state be $(S_t, L_{t-1})$. Upon receiving $D_t$, the system performs:
+
+\begin{equation}
+\text{if } \mathcal{I}(D_t, L_{t-1}) = \text{accept} \text{ then } L_t = \mathcal{H}(\mathcal{H}(\mathcal{S}(D_t)) \concat L_{t-1})
+\end{equation}
+
+Otherwise, the state remains unchanged.
+
+This defines a state transition function:
+
+\begin{equation}
+(S_t, L_{t-1}) \xrightarrow{D_t} (S_{t+1}, L_t)
+\end{equation}
+
+only if validation succeeds.
+
+\section{Rejection as Default Behavior}
+
+The ingestion operator enforces a default rejection policy:
+
+\begin{equation}
+\mathcal{I}(D_t, L_{t-1}) = \text{reject} \quad \text{unless explicitly validated}
+\end{equation}
+
+This ensures that any failure in verification results in rejection, eliminating ambiguity in decision-making.
+
+\section{Implications for Security}
+
+The zero-trust ingestion framework ensures that the acceptance of telemetry is determined solely by cryptographic and structural validity. By distributing verification across multiple independent validators and enforcing a threshold condition, the system eliminates reliance on any single entity and provides resilience against adversarial manipulation.
+
+In summary, the ingestion process transforms the telemetry pipeline into a formally verified boundary that enforces the integrity invariants defined in the cryptographic core. This establishes a robust defense against injection, modification, replay, and collusion attacks, ensuring that only valid telemetry is admitted into the system.
+
+\section{Threshold Cryptography and Distributed Proof Aggregation}
+
+The zero-trust ingestion framework relies fundamentally on the ability to distribute trust across multiple independent validators while preserving a unified verification outcome. This is achieved through threshold cryptography, which enables a set of validators to collectively generate a single cryptographic proof without any individual validator possessing sufficient authority to do so independently. The resulting construction ensures that the acceptance of telemetry is contingent upon a quorum of validators, thereby providing resilience against Byzantine faults and adversarial compromise.
+
+Let $\mathcal{V} = \{V_1, V_2, \dots, V_n\}$ denote the set of validator nodes. Each validator $V_i$ is associated with a private key share $K_i$ derived from a master secret $K$ through a distributed key generation process. The corresponding public key is denoted by $PK$.
+
+\subsection{Threshold Signature Model}
+
+A threshold signature scheme is defined by a tuple of algorithms:
+
+\begin{equation}
+(\text{KeyGen}, \text{Sign}_i, \text{Aggregate}, \text{Verify})
+\end{equation}
+
+where $\text{KeyGen}$ generates key shares $(K_1, \dots, K_n)$ and a public key $PK$, $\text{Sign}_i$ produces a partial signature using $K_i$, $\text{Aggregate}$ combines partial signatures into a single signature, and $\text{Verify}$ validates the aggregated signature.
+
+Given a message $M_t$, each validator computes a partial signature:
+
+\begin{equation}
+\sigma_i = \text{Sign}_i(M_t, K_i)
+\end{equation}
+
+An aggregated signature is constructed as:
+
+\begin{equation}
+\Sigma_t = \text{Aggregate}(\sigma_{i_1}, \dots, \sigma_{i_m})
+\end{equation}
+
+for a subset of validators $\{i_1, \dots, i_m\}$ such that $m \geq t$, where $t$ is the threshold.
+
+The aggregated signature satisfies:
+
+\begin{equation}
+\text{Verify}(M_t, \Sigma_t, PK) = \text{true}
+\end{equation}
+
+\subsection{Application to Proof of Reflexion}
+
+In the context of the RCO protocol, the message $M_t$ is defined as:
+
+\begin{equation}
+M_t = \mathcal{H}_S(S_t) \concat L_t
+\end{equation}
+
+Each validator independently verifies the validity of $(S_t, L_t)$ and produces a partial signature:
+
+\begin{equation}
+\sigma_i = \text{Sign}_i(\mathcal{H}_S(S_t) \concat L_t, K_i)
+\end{equation}
+
+The aggregated proof is:
+
+\begin{equation}
+\Sigma_t = \text{Aggregate}(\sigma_{i_1}, \dots, \sigma_{i_m})
+\end{equation}
+
+This construction ensures that the proof $\Sigma_t$ is valid only if at least $t$ validators agree on the validity of the telemetry.
+
+\subsection{Correctness Property}
+
+The threshold signature scheme satisfies correctness if:
+
+\begin{equation}
+\forall M_t, \quad \text{Verify}(M_t, \Sigma_t, PK) = \text{true}
+\end{equation}
+
+whenever $\Sigma_t$ is constructed from at least $t$ valid partial signatures.
+
+\subsection{Unforgeability Under Threshold}
+
+\begin{theorem}[Threshold Unforgeability]
+Assuming that the underlying signature scheme is EUF-CMA secure, an adversary controlling fewer than $t$ key shares cannot produce a valid aggregated signature for any message $M_t$ not previously signed by at least $t$ honest validators.
+\end{theorem}
+
+\begin{proof}
+Let $\mathcal{A}$ be an adversary controlling a subset $\mathcal{C} \subset \mathcal{V}$ with $|\mathcal{C}| = f < t$. The adversary can produce partial signatures $\{\sigma_i\}_{i \in \mathcal{C}}$ for any message $M_t$.
+
+To produce a valid aggregated signature $\Sigma_t$, the adversary must obtain at least $t$ valid partial signatures. Since $f < t$, the adversary must either:
+
+\begin{equation}
+\text{(i)} \quad \text{Forge at least one partial signature from an honest validator}
+\end{equation}
+
+or:
+
+\begin{equation}
+\text{(ii)} \quad \text{Forge the aggregated signature directly}
+\end{equation}
+
+The first case contradicts the EUF-CMA security of the signature scheme, as it requires forging a signature under an honest validator's key share. The second case also contradicts EUF-CMA security, as the aggregated signature is a valid signature under $PK$.
+
+Therefore, the adversary cannot produce a valid $\Sigma_t$ without controlling at least $t$ key shares.
+\end{proof}
+
+\subsection{Robustness Against Collusion}
+
+Let $\mathcal{C} \subseteq \mathcal{V}$ be a colluding subset of validators. The adversary succeeds only if:
+
+\begin{equation}
+|\mathcal{C}| \geq t
+\end{equation}
+
+Otherwise, the adversary cannot produce a valid aggregated signature. This establishes that the system tolerates up to $f = t - 1$ Byzantine validators.
+
+\subsection{Soundness of Verification}
+
+The verification function ensures that only correctly aggregated signatures are accepted. Let $\Sigma_t$ be an aggregated signature. Then:
+
+\begin{equation}
+\text{Verify}(M_t, \Sigma_t, PK) = \text{true}
+\end{equation}
+
+if and only if $\Sigma_t$ is constructed from at least $t$ valid partial signatures.
+
+Any deviation in the aggregation process results in:
+
+\begin{equation}
+\text{Verify}(M_t, \Sigma_t, PK) = \text{false}
+\end{equation}
+
+with overwhelming probability.
+
+\subsection{Aggregation Linearity and Efficiency}
+
+In many threshold schemes, such as those based on pairing-based cryptography, the aggregation function is linear:
+
+\begin{equation}
+\Sigma_t = \sum_{i=1}^{m} \sigma_i
+\end{equation}
+
+This property enables efficient aggregation and verification, as the cost of verification is independent of $m$.
+
+\subsection{Resistance to Replay Attacks}
+
+Each message $M_t$ includes the lineage state $L_t$, which is unique for each time step. Therefore, even if an adversary reuses a previously valid signature $\Sigma_k$, it will not be valid for a different lineage state:
+
+\begin{equation}
+M_k \neq M_t \implies \text{Verify}(M_t, \Sigma_k, PK) = \text{false}
+\end{equation}
+
+This prevents replay attacks.
+
+\subsection{Consistency Across Validators}
+
+Each validator independently computes:
+
+\begin{equation}
+M_t = \mathcal{H}_S(S_t) \concat L_t
+\end{equation}
+
+Deterministic serialization and lineage construction ensure that all honest validators compute identical $M_t$. Therefore:
+
+\begin{equation}
+\sigma_i = \text{Sign}_i(M_t, K_i)
+\end{equation}
+
+are consistent across validators, enabling correct aggregation.
+
+\subsection{Integration with Ingestion Pipeline}
+
+The ingestion operator incorporates threshold verification as follows:
+
+\begin{equation}
+\mathcal{I}(D_t, L_{t-1}) =
+\begin{cases}
+\text{accept}, & \text{Verify}(M_t, \Sigma_t, PK) = \text{true} \\
+\text{reject}, & \text{otherwise}
+\end{cases}
+\end{equation}
+
+where $M_t = \mathcal{H}_S(S_t) \concat L_t$.
+
+\subsection{Latency and Parallelism}
+
+Partial signatures may be generated in parallel across validators. Let $T_{\text{sign}}$ denote the time to generate a partial signature and $T_{\text{agg}}$ the time to aggregate. Then the total latency is:
+
+\begin{equation}
+T_{\text{total}} = \max_i T_{\text{sign}}^{(i)} + T_{\text{agg}} + T_{\text{verify}}
+\end{equation}
+
+This enables scalable ingestion under high throughput.
+
+\subsection{Security Bound}
+
+The probability that an adversary successfully forges a valid aggregated signature is bounded by:
+
+\begin{equation}
+\Pr[\text{Forge}] \leq \epsilon_{\text{sig}} + \epsilon_{\text{coll}}
+\end{equation}
+
+where $\epsilon_{\text{sig}}$ is the forgery probability of the signature scheme and $\epsilon_{\text{coll}}$ accounts for any hash collisions.
+
+\subsection{Conclusion}
+
+The threshold cryptographic framework provides a robust mechanism for distributing trust across multiple validators while maintaining a unified verification outcome. By requiring a quorum of validators to produce a valid proof, the system eliminates single points of failure and ensures resilience against Byzantine adversaries. When integrated with the Proof of Reflexion and lineage construction, this mechanism establishes a zero-trust ingestion pipeline in which telemetry is admitted only upon satisfying a collectively enforced integrity condition.
+
+\section{Ingestion Consistency, Ordering, and Deterministic Acceptance}
+
+The correctness of the zero-trust ingestion framework depends not only on the validity of individual telemetry elements but also on the preservation of a globally consistent ordering and deterministic acceptance behavior across all participating nodes. In distributed systems, inconsistencies in ordering or acceptance decisions can lead to divergence in system state, undermining the integrity guarantees established by the cryptographic core. This section formalizes the constraints and mechanisms required to ensure that ingestion remains deterministic, ordered, and globally consistent under concurrent and adversarial conditions.
+
+\subsection{Temporal Ordering Model}
+
+Let $\{D_t\}_{t \in \mathbb{N}}$ denote a sequence of telemetry elements indexed by logical time $t$. The ingestion process must enforce a strict total order over accepted telemetry such that:
+
+\begin{equation}
+t_1 < t_2 \implies D_{t_1} \prec D_{t_2}
+\end{equation}
+
+where $\prec$ denotes the ingestion order. This ordering is not derived from wall-clock time but from the lineage structure, which imposes a deterministic sequence.
+
+Let $L_t$ denote the lineage state after accepting $D_t$. Then:
+
+\begin{equation}
+L_t = \mathcal{H}(H_t \concat L_{t-1})
+\end{equation}
+
+This recursive dependency enforces that $D_t$ cannot be accepted unless $L_{t-1}$ is known and verified, thereby establishing a strict sequential dependency.
+
+\subsection{Sequential Consistency Invariant}
+
+The ingestion process satisfies sequential consistency if all nodes observe the same order of accepted telemetry. Formally, let $\mathcal{N}$ denote the set of nodes, and let $\prec_i$ denote the ordering observed by node $i$. Then:
+
+\begin{equation}
+\forall i,j \in \mathcal{N}, \quad \prec_i = \prec_j
+\end{equation}
+
+This invariant ensures that the lineage state is consistent across all nodes.
+
+\subsection{Deterministic Acceptance Function}
+
+Define the acceptance function:
+
+\begin{equation}
+\mathcal{A}(D_t, L_{t-1}) =
+\begin{cases}
+1, & \text{if } \mathcal{I}(D_t, L_{t-1}) = \text{accept} \\
+0, & \text{otherwise}
+\end{cases}
+\end{equation}
+
+The ingestion framework requires that $\mathcal{A}$ be deterministic, i.e., for any two nodes $i$ and $j$:
+
+\begin{equation}
+\mathcal{A}_i(D_t, L_{t-1}) = \mathcal{A}_j(D_t, L_{t-1})
+\end{equation}
+
+This property follows from the determinism of serialization, hashing, lineage construction, and proof verification.
+
+\subsection{Concurrency Model}
+
+In practical systems, telemetry elements may be generated concurrently. Let $\{D_t^{(1)}, D_t^{(2)}, \dots\}$ denote concurrent telemetry candidates for the same logical position. The ingestion system must resolve such conflicts deterministically.
+
+Define a selection function:
+
+\begin{equation}
+D_t^* = \arg\min_{D \in \mathcal{C}_t} \mathcal{O}(D)
+\end{equation}
+
+where $\mathcal{C}_t$ is the set of candidate telemetry elements and $\mathcal{O}$ is a deterministic ordering function defined over canonical encodings:
+
+\begin{equation}
+\mathcal{O}(D) = \mathcal{S}(D)
+\end{equation}
+
+interpreted lexicographically. This ensures that all nodes select the same $D_t^*$.
+
+\subsection{Deterministic Conflict Resolution}
+
+\begin{theorem}[Deterministic Conflict Resolution]
+Given a set of candidate telemetry elements $\mathcal{C}_t$, all honest nodes select the same element $D_t^*$.
+\end{theorem}
+
+\begin{proof}
+Since $\mathcal{S}$ is canonical, all nodes compute identical encodings for each $D \in \mathcal{C}_t$. The lexicographic ordering over $\mathcal{S}(D)$ is deterministic. Therefore, the minimization yields the same $D_t^*$ across all nodes.
+\end{proof}
+
+\subsection{Resistance to Reordering Attacks}
+
+An adversary may attempt to reorder telemetry elements to influence system behavior. Let $\pi$ be a permutation such that:
+
+\begin{equation}
+D_t' = D_{\pi(t)}
+\end{equation}
+
+The lineage construction enforces:
+
+\begin{equation}
+L_t' = \mathcal{H}(H_t' \concat L_{t-1}')
+\end{equation}
+
+Since $H_t' \neq H_t$ for non-trivial permutations, it follows that:
+
+\begin{equation}
+L_t' \neq L_t
+\end{equation}
+
+with overwhelming probability. Therefore, reordered sequences are rejected.
+
+\subsection{Gap Detection and Continuity Enforcement}
+
+The ingestion process enforces continuity of the sequence. Let $t$ be the expected index. A telemetry element $D_t$ is accepted only if:
+
+\begin{equation}
+L_{t-1} \text{ is known and valid}
+\end{equation}
+
+If a gap occurs, i.e., $D_t$ is received before $D_{t-1}$, then:
+
+\begin{equation}
+\mathcal{I}(D_t, L_{t-1}) = \text{reject}
+\end{equation}
+
+This prevents omission attacks.
+
+\subsection{Replay Attack Prevention}
+
+Replay attacks involve reusing previously accepted telemetry. Let $D_k$ be a previously accepted element. For $k < t$, attempting to replay $D_k$ yields:
+
+\begin{equation}
+H_k = \mathcal{H}(\mathcal{S}(D_k))
+\end{equation}
+
+but the lineage context differs:
+
+\begin{equation}
+L_{t-1} \neq L_{k-1}
+\end{equation}
+
+Therefore:
+
+\begin{equation}
+\mathcal{H}(H_k \concat L_{t-1}) \neq L_k
+\end{equation}
+
+and the replayed element is rejected.
+
+\subsection{Global Determinism Theorem}
+
+\begin{theorem}[Global Ingestion Determinism]
+Assuming all nodes receive the same set of telemetry inputs and implement the RCO ingestion protocol, they will produce identical lineage sequences $\{L_t\}$.
+\end{theorem}
+
+\begin{proof}
+The ingestion process consists of deterministic operations: canonical serialization, hashing, lineage construction, and threshold verification. Conflict resolution is also deterministic. Therefore, all nodes accept the same sequence of telemetry elements in the same order, resulting in identical lineage sequences.
+\end{proof}
+
+\subsection{Consistency Under Network Delay}
+
+Let $\Delta$ denote network delay. Nodes may receive telemetry in different orders due to latency. However, since acceptance depends on lineage continuity, nodes buffer out-of-order inputs until $L_{t-1}$ is available.
+
+Define a buffer $\mathcal{B}$ such that:
+
+\begin{equation}
+\mathcal{B} = \{D_t \mid L_{t-1} \text{ not yet available}\}
+\end{equation}
+
+Once $L_{t-1}$ is established, buffered elements are processed deterministically.
+
+\subsection{Convergence Property}
+
+\begin{theorem}[Eventual Convergence]
+Under reliable communication, all honest nodes eventually converge to the same lineage state $L_t$.
+\end{theorem}
+
+\begin{proof}
+All valid telemetry is eventually received by all nodes. Deterministic processing ensures identical acceptance decisions. Therefore, all nodes compute the same lineage sequence.
+\end{proof}
+
+\subsection{Integration with Threshold Verification}
+
+The acceptance condition incorporates threshold verification:
+
+\begin{equation}
+\mathcal{A}(D_t, L_{t-1}) = 1 \iff \text{Verify}(M_t, \Sigma_t, PK) = \text{true}
+\end{equation}
+
+This ensures that only telemetry approved by a quorum of validators is considered for ordering.
+
+\subsection{Final Ordering Invariant}
+
+The ingestion process enforces the invariant:
+
+\begin{equation}
+\forall t, \quad L_t = \mathcal{H}(H_t \concat L_{t-1}) \land \mathcal{A}(D_t, L_{t-1}) = 1
+\end{equation}
+
+which ensures that the sequence is ordered, continuous, and valid.
+
+\subsection{Conclusion}
+
+The ingestion consistency framework ensures that telemetry is admitted into the system in a deterministic and globally consistent manner. By enforcing strict ordering, deterministic conflict resolution, and continuity constraints, the RCO protocol eliminates ambiguity in sequence construction and ensures that all nodes maintain an identical view of system history. These properties are essential for preserving the integrity guarantees established by the cryptographic core and for enabling reproducible system behavior in distributed environments.
+
+\section{Unified Ingestion Integrity and End-to-End Security Composition}
+
+The preceding sections have established the structural, cryptographic, and distributed properties of the zero-trust ingestion framework. Deterministic serialization ensures canonical representation, cryptographic hashing provides collision-resistant compression, Merkle-lineage enforces temporal integrity, Proof of Reflexion binds telemetry to system state, and threshold cryptography distributes trust across validators. The ingestion layer integrates these components into a unified acceptance mechanism that determines whether telemetry is admitted into the system.
+
+Let the ingestion pipeline be defined as:
+
+\begin{equation}
+\mathcal{I}_{\text{RCO}} = \mathcal{V}_{\text{threshold}} \circ \mathcal{V}_{\text{PoR}} \circ \mathcal{C} \circ \mathcal{H} \circ \mathcal{S}
+\end{equation}
+
+This pipeline defines a mapping:
+
+\begin{equation}
+\mathcal{I}_{\text{RCO}}: \mathcal{D} \times \mathcal{L} \rightarrow \{\text{accept}, \text{reject}\}
+\end{equation}
+
+such that a telemetry element $D_t$ is accepted if and only if it satisfies all integrity conditions.
+
+\subsection{Unified Acceptance Condition}
+
+The ingestion operator accepts $D_t$ if and only if:
+
+\begin{equation}
+\mathcal{I}_{\text{RCO}}(D_t, L_{t-1}) = \text{accept} \iff
+\begin{cases}
+\mathcal{S}(D_t) \text{ is canonical} \\
+H_t = \mathcal{H}(\mathcal{S}(D_t)) \\
+L_t = \mathcal{H}(H_t \concat L_{t-1}) \\
+M_t = \mathcal{H}_S(S_t) \concat L_t \\
+\Sigma_t = \text{Aggregate}(\{\sigma_i\}_{i=1}^{m}) \\
+\text{Verify}(M_t, \Sigma_t, PK) = \text{true}
+\end{cases}
+\end{equation}
+
+This condition ensures that the telemetry is deterministically represented, structurally consistent, temporally valid, state-bound, and collectively verified.
+
+\subsection{End-to-End Integrity Theorem}
+
+\begin{theorem}[End-to-End Ingestion Integrity]
+Assuming that:
+\begin{enumerate}
+\item The serialization function $\mathcal{S}$ is canonical,
+\item The hash functions $\mathcal{H}$ and $\mathcal{H}_S$ are collision-resistant,
+\item The signature scheme is EUF-CMA secure,
+\item Fewer than $t$ validators are Byzantine,
+\end{enumerate}
+then for any telemetry element $D_t'$ such that $D_t' \not\equiv D_t$, it holds that:
+
+\[
+\Pr[\mathcal{I}_{\text{RCO}}(D_t', L_{t-1}) = \text{accept}] \leq \epsilon
+\]
+
+where $\epsilon$ is negligible.
+\end{theorem}
+
+\begin{proof}
+Let $D_t'$ be an invalid telemetry element. For $\mathcal{I}_{\text{RCO}}(D_t', L_{t-1})$ to return $\text{accept}$, all conditions in the unified acceptance condition must be satisfied.
+
+First, if $\mathcal{S}$ is canonical, then $D_t' \not\equiv D_t$ implies:
+
+\[
+\mathcal{S}(D_t') \neq \mathcal{S}(D_t)
+\]
+
+which implies:
+
+\[
+\mathcal{H}(\mathcal{S}(D_t')) \neq \mathcal{H}(\mathcal{S}(D_t))
+\]
+
+except with probability $\epsilon_{\mathcal{H}}$.
+
+Second, the lineage condition requires:
+
+\[
+L_t' = \mathcal{H}(H_t' \concat L_{t-1})
+\]
+
+If $H_t' \neq H_t$, then $L_t' \neq L_t$ except with negligible probability due to collision resistance.
+
+Third, the Proof of Reflexion requires a valid signature:
+
+\[
+\Sigma_t' = \text{Aggregate}(\{\sigma_i'\})
+\]
+
+for the message $M_t' = \mathcal{H}_S(S_t') \concat L_t'$. Since fewer than $t$ validators are Byzantine, the adversary cannot produce $t$ valid partial signatures without either forging signatures or inducing collisions in $\mathcal{H}_S$.
+
+Thus, the adversary must succeed in at least one of the following:
+
+\begin{equation}
+\text{(i)} \quad \text{Break canonical determinism}
+\end{equation}
+
+\begin{equation}
+\text{(ii)} \quad \text{Find a collision in } \mathcal{H}
+\end{equation}
+
+\begin{equation}
+\text{(iii)} \quad \text{Find a collision in } \mathcal{H}_S
+\end{equation}
+
+\begin{equation}
+\text{(iv)} \quad \text{Forge } t \text{ valid partial signatures}
+\end{equation}
+
+Each of these events has negligible probability. Therefore, the probability that $\mathcal{I}_{\text{RCO}}(D_t', L_{t-1}) = \text{accept}$ is negligible.
+\end{proof}
+
+\subsection{Soundness and Completeness}
+
+The ingestion pipeline satisfies both soundness and completeness:
+
+\begin{equation}
+\text{Soundness: } \mathcal{I}_{\text{RCO}}(D_t', L_{t-1}) = \text{accept} \implies D_t' \equiv D_t
+\end{equation}
+
+\begin{equation}
+\text{Completeness: } D_t \text{ valid } \implies \mathcal{I}_{\text{RCO}}(D_t, L_{t-1}) = \text{accept}
+\end{equation}
+
+Soundness ensures that invalid telemetry is never accepted, while completeness ensures that valid telemetry is not rejected.
+
+\subsection{Elimination of Ingestion-Level Perturbations}
+
+Let $\delta_t^{\text{ingest}}$ denote perturbations introduced at the ingestion layer. Under the RCO protocol:
+
+\begin{equation}
+\delta_t^{\text{ingest}} = 0 \quad \forall t
+\end{equation}
+
+as any deviation results in rejection. Substituting into the system dynamics:
+
+\begin{equation}
+\Delta_{t+1} \leq L_s \Delta_t
+\end{equation}
+
+ensures that ingestion does not introduce instability.
+
+\subsection{Compositional Security}
+
+The ingestion layer composes with the cryptographic core to yield end-to-end security. Let $\mathcal{P}_{\text{core}}$ denote the cryptographic core pipeline. Then:
+
+\begin{equation}
+\mathcal{P}_{\text{system}} = \mathcal{P}_{\text{core}} \circ \mathcal{I}_{\text{RCO}}
+\end{equation}
+
+satisfies:
+
+\begin{equation}
+\forall D_t, \quad \mathcal{P}_{\text{system}}(D_t) = \text{true} \implies \text{Valid}(D_t)
+\end{equation}
+
+This establishes that the entire system preserves integrity from ingestion to storage.
+
+\subsection{Global Ingestion Invariant}
+
+The ingestion process enforces the invariant:
+
+\begin{equation}
+\forall t, \quad \mathcal{I}_{\text{RCO}}(D_t, L_{t-1}) = \text{accept} \implies
+\begin{cases}
+D_t \text{ is authentic} \\
+D_t \text{ is state-consistent} \\
+D_t \text{ is temporally valid} \\
+D_t \text{ is uniquely ordered}
+\end{cases}
+\end{equation}
+
+\subsection{Final Security Bound}
+
+The overall probability of system compromise is bounded by:
+
+\begin{equation}
+\Pr[\text{Compromise}] \leq \epsilon_{\mathcal{S}} + \epsilon_{\mathcal{H}} + \epsilon_{\mathcal{H}_S} + \epsilon_{\text{sig}} + \epsilon_{\text{threshold}}
+\end{equation}
+
+where each term is negligible.
+
+\subsection{Conclusion}
+
+The zero-trust ingestion framework completes the integrity architecture of the RCO protocol by ensuring that only valid telemetry is admitted into the system. Through the integration of deterministic encoding, cryptographic lineage, Proof of Reflexion, and threshold verification, the ingestion process enforces a comprehensive set of invariants that eliminate ambiguity, prevent adversarial manipulation, and ensure global consistency.
+
+This establishes a formally verified boundary condition for the system, guaranteeing that all accepted telemetry satisfies the integrity requirements necessary for stable and reproducible computation.

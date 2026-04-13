@@ -1,0 +1,79 @@
+\documentclass[12pt,a4paper]{report}
+
+\input{preamble/packages}
+\input{preamble/macros}
+\input{preamble/formatting}
+
+\begin{document}
+
+\pagenumbering{roman}
+\input{frontmatter/titlepage}
+\input{frontmatter/abstract}
+\input{frontmatter/acknowledgements}
+\input{frontmatter/definitions}
+\input{frontmatter/glossary}
+
+\newpage
+\tableofcontents
+\listoffigures
+\listoftables
+
+\chapter{Executive Engineering Mandate}
+\input{chapters/01_executive_mandate}
+
+\chapter{Cryptographic Core}
+\input{chapters/02_cryptographic_core}
+
+\chapter{Zero-Trust Ingestion}
+\input{chapters/03_zero_trust_ingestion}
+
+\chapter{Formal Security Calculus}
+\input{chapters/04_security_calculus}
+
+\chapter{RCO-Lite Architecture}
+\input{chapters/05_rco_lite}
+
+\chapter{API \& SDK Specification}
+\input{chapters/06_api_reference}
+
+\chapter{Minimal Working Example}
+\input{chapters/07_minimal_working_example}
+
+\chapter{Failure Mode Analysis}
+\input{chapters/08_fmea}
+
+\chapter{Infrastructure Profiles}
+\input{chapters/09_infrastructure_profiles}
+
+\chapter{SRE Runbooks}
+\input{chapters/10_sre_runbooks}
+
+\chapter{Performance \& Cost Analysis}
+\input{chapters/11_performance_analysis}
+
+\chapter{Theoretical Foundations}
+\input{chapters/12_theoretical_foundations}
+
+\chapter{Applications}
+\input{chapters/13_applications}
+
+\chapter{Claims and Novelty}
+\input{chapters/14_claims_and_novelty}
+
+\newpage
+
+\chapter{Appendix A: Mathematic Proofs and Congnizitions}
+\input{appendices/appendix_a_math_proofs}
+
+\newpage
+\chapter{Appendix B: Code Listings and Algorithmic Approaches}
+\input{appendices/appendix_b_code_listings}
+
+\newpage
+\chapter{Appendix C: Protocol Constants}
+\input{appendices/appendix_c_protocol_constants}
+
+\bibliographystyle{IEEEtran}
+\bibliography{bibliography/references}
+
+\end{document}
