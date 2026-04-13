@@ -1,6 +1,6 @@
 # RRL RCO Protocol: Technical & Implementation Manual (v8.0)
 **Security Classification**: Audit-Grade / L-5 Integrity
-**Signatory**: Mohit Ranjan Research Group
+**Signatory**: Mohit Ranjan (Student Researcher)
 **Status**: Execution Definitive (Cryptographic Integrity)
 
 ---
