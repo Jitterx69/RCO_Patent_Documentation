@@ -78,6 +78,13 @@ independent of the origin of $D_t$.
 
 To eliminate single points of failure, the ingestion process employs a distributed verification model involving a set of validator nodes. Let $\mathcal{V} = \{V_1, V_2, \dots, V_n\}$ denote the set of validators.
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/2-Dimentionals/validator_consensus.png}
+\caption{Distributed validator consensus model implementing threshold signature verification across independent nodes.}
+\label{fig:validator}
+\end{figure}
+
 Each validator $V_i$ implements a local verification function:
 
 \begin{equation}

@@ -376,6 +376,13 @@ L_0 = \mathcal{H}(H_0 \concat \mathsf{IV})
 
 where $\mathsf{IV}$ is a fixed initialization vector or genesis constant.
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/2-Dimentionals/lineage_structure.png}
+\caption{Cryptographic lineage chain construction linking telemetry batches via hash dependencies, ensuring forward integrity and tamper propagation.}
+\label{fig:lineage}
+\end{figure}
+
 This recursive definition induces a chain structure in which each lineage value $L_t$ depends on all preceding telemetry elements.
 
 \subsection{Lineage as a Cryptographic State Machine}
@@ -543,6 +550,13 @@ In summary, the Merkle-Lineage construction provides a cryptographic mechanism f
 \section{Proof of Reflexion (PoR)}
 
 While deterministic serialization and Merkle-lineage construction ensure structural integrity and temporal consistency of telemetry data, they do not, by themselves, guarantee that the telemetry originates from a legitimate computational process or that it accurately reflects the internal state of the system. The Proof of Reflexion (PoR) addresses this limitation by introducing a cryptographic mechanism that binds telemetry lineage to the originating computational state, thereby enforcing semantic integrity in addition to structural integrity.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/2-Dimentionals/state_binding.png}
+\caption{State binding mechanism associating telemetry with originating computational state, forming the basis of Proof of Reflexion.}
+\label{fig:state-binding}
+\end{figure}
 
 The central concept underlying PoR is that telemetry disclosures must not only be consistent and immutable but must also be reflexively derived from the internal state of the system. This requirement is formalized by establishing a cryptographic dependency between the lineage state $L_t$ and a representation of the system state $S_t$.
 

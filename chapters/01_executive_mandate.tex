@@ -668,6 +668,13 @@ These requirements form the foundation for the architecture described in subsequ
 
 The limitations of existing telemetry systems, when formalized as violations of deterministic encoding, lineage continuity, state binding, and distributed verification, necessitate the introduction of a unified framework that enforces these invariants as intrinsic properties of the system. The Feedback-Coupled Cryptographic Observation (RCO) Protocol constitutes such a framework, providing a mathematically grounded mechanism for ensuring that telemetry data functions as a deterministic, immutable, and verifiable component of system evolution.
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/2-Dimentionals/validation_timing.png}
+\caption{Comparison between traditional post-ingestion validation and RCO pre-ingestion validation, highlighting enforcement of integrity prior to persistence.}
+\label{fig:validation-timing}
+\end{figure}
+
 The RCO protocol may be interpreted as a transformation of the telemetry pipeline into a formally constrained computational operator. Let the pipeline be defined as a composition:
 
 \begin{equation}

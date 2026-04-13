@@ -134,6 +134,13 @@ The system implements a deterministic pipeline:
 D_t \rightarrow \mathcal{S} \rightarrow \mathcal{H} \rightarrow \mathcal{C} \rightarrow \mathcal{H}_S \rightarrow \text{Sign} \rightarrow \text{Aggregate} \rightarrow \text{Verify}
 \end{equation}
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/2-Dimentionals/pipeline_diagram.png}
+\caption{End-to-End RCO Validation Pipeline illustrating canonicalization, hashing, lineage construction, state binding, and multi-party validation prior to ingestion.}
+\label{fig:pipeline}
+\end{figure}
+
 Each stage is stateless with respect to external influence and deterministic given its inputs.
 
 \section{Data Flow Model}
@@ -340,6 +347,13 @@ The following structure can be used to render diagrams:
 \section{Real-World Deployment Topologies}
 
 The RCO architecture is designed to operate across multiple deployment environments, including centralized cloud systems, decentralized edge networks, and hybrid configurations.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/2-Dimentionals/deployment_topology.png}
+\caption{Distributed deployment topology across edge and cloud environments, illustrating producers, ingestion layer, validator fabric, and storage systems.}
+\label{fig:deployment}
+\end{figure}
 
 \subsection{Cloud Deployment Model}
 

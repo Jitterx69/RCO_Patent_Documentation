@@ -52,6 +52,13 @@ Third, immutability. Once a telemetry input is accepted and recorded, it cannot 
 
 Fourth, rejection on uncertainty. If any stage of validation fails or produces ambiguous results, the API must reject the input rather than attempting correction.
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/2-Dimentionals/api_interaction_flow.png}
+\caption{API interaction lifecycle from client request through RCO validation pipeline to proof generation and response.}
+\label{fig:api}
+\end{figure}
+
 \section{Request Lifecycle}
 
 The lifecycle of an API request can be described as a sequence of transformations.
@@ -525,6 +532,13 @@ The SDK supports multiple integration patterns.
 In a microservices architecture, the SDK may be embedded within each service that produces telemetry. This allows direct interaction with the RCO API.
 
 In an event-driven architecture, the SDK may process events from message queues and submit them for validation.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/2-Dimentionals/sdk_integration_model.png}
+\caption{SDK integration across microservices, streaming systems, and middleware architectures enabling seamless adoption of RCO.}
+\label{fig:sdk}
+\end{figure}
 
 In a centralized architecture, a dedicated service may act as a gateway, using the SDK to process all incoming telemetry.
 

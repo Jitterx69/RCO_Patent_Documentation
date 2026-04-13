@@ -2,6 +2,13 @@
 
 The purpose of this section is to establish a rigorous security framework for the Feedback-Coupled Cryptographic Observation (RCO) protocol by formalizing the adversarial capabilities, defining security games, and proving that the protocol satisfies strong integrity and unforgeability guarantees under standard cryptographic assumptions. Unlike conventional systems in which telemetry integrity is treated as an auxiliary concern, the RCO protocol treats telemetry as a causative variable within system dynamics, necessitating a security model that accounts for both structural and semantic integrity.
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/2-Dimentionals/feedback_system_loop.png}
+\caption{Feedback-coupled system model where state evolution is constrained by validated telemetry inputs, forming a closed-loop integrity system.}
+\label{fig:feedback}
+\end{figure}
+
 Let $\mathcal{D}$ denote the space of telemetry inputs, $\mathcal{S}$ the space of system states, and $\mathcal{L}$ the lineage space. The system operates over sequences:
 
 \begin{equation}
@@ -231,6 +238,13 @@ The security of the RCO protocol against replay, reordering, and injection attac
 \subsection{Replay Attack Resistance}
 
 A replay attack is defined as an adversarial attempt to reuse previously valid telemetry $D_k$ at a later time $t > k$ in order to induce incorrect system behavior.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/2-Dimentionals/replay_prevention.png}
+\caption{Replay attack prevention mechanism ensuring previously accepted telemetry cannot be reintroduced into the system.}
+\label{fig:replay}
+\end{figure}
 
 \subsubsection{Replay Game Definition}
 
