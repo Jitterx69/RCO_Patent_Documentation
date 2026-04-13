@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>State Binding and Contextual Integrity in RCO</title>
+    <style>
+        body { margin: 0; background-color: #000810; overflow: hidden; font-family: 'Inter', sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; }
+        .ui-panel {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            color: #00d2ff;
+            pointer-events: none;
+        }
+        .title { font-size: 22px; font-weight: bold; text-shadow: 0 0 15px rgba(0, 210, 255, 0.5); }
+        .subtitle { font-size: 14px; opacity: 0.8; margin-top: 5px; color: #88aacc; }
+        .label {
+            position: absolute;
+            background: rgba(0, 10, 20, 0.85);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #00d2ff;
+            font-size: 13px;
+            pointer-events: none;
+            display: none;
+            transform: translate(-50%, -100%);
+            z-index: 10;
+        }
+        .controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+        }
+        .btn {
+            background: rgba(0, 40, 80, 0.6);
+            color: #00d2ff;
+            border: 1px solid #00d2ff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+        .btn:hover { background: #00d2ff; color: #000810; }
+        .btn.active { background: #38a169; border-color: #38a169; color: white; }
+        .btn.error { background: #e53e3e; border-color: #e53e3e; color: white; }
+    </style>
+</head>
+<body>
+    <div class="ui-panel">
+        <div class="title">STATE BINDING & CONTEXTUAL INTEGRITY</div>
+        <div class="subtitle">Same Telemetry (H_t) in different System Contexts (S_t vs S_t')</div>
+    </div>
+    <div id="label" class="label"></div>
+    <div class="controls">
+        <button id="btn-valid" class="btn active">VALID CONTEXT (S_t)</button>
+        <button id="btn-invalid" class="btn">INVALID CONTEXT (S_t')</button>
+    </div>
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        let scene, camera, renderer, controls, raycaster, mouse;
+        const nodes = [];
+        const streams = [];
+        let activePath = 'valid';
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 8, 20);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            const ambient = new THREE.AmbientLight(0x404040, 2);
+            scene.add(ambient);
+            const point = new THREE.PointLight(0xffffff, 1.5, 100);
+            point.position.set(10, 10, 10);
+            scene.add(point);
+
+            buildPipeline();
+
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            window.addEventListener('mousemove', onMouseMove);
+            document.getElementById('btn-valid').addEventListener('click', () => setPath('valid'));
+            document.getElementById('btn-invalid').addEventListener('click', () => setPath('invalid'));
+
+            animate();
+        }
+
+        function createNode(id, x, y, z, color, label, formula) {
+            const geom = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+            const mat = new THREE.MeshPhongMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
+            const mesh = new THREE.Mesh(geom, mat);
+            mesh.position.set(x, y, z);
+            mesh.userData = { id, label, formula };
+            scene.add(mesh);
+            nodes.push(mesh);
+            return mesh;
+        }
+
+        function buildPipeline() {
+            // Shared Start
+            const n_dt = createNode('dt', -15, 0, 0, 0x00d2ff, 'Telemetry Input (D_t)', 'Raw Event Data');
+            const n_ht = createNode('ht', -10, 0, 0, 0x00d2ff, 'H_t', 'Canonical Hash of Data');
+            const n_lt = createNode('lt', -5, 0, 0, 0x00d2ff, 'Lineage L_t', 'History Pointer');
+
+            // Path 1 (Valid)
+            const n_st = createNode('st', 0, 3, -4, 0x38a169, 'System State S_t', 'Valid Simulation Context');
+            const n_mt = createNode('mt', 5, 3, -4, 0x38a169, 'M_t = H(S_t) || L_t', 'State-Bound Message');
+            const n_acc = createNode('acc', 10, 3, -4, 0x38a169, 'ACCEPT', 'Verified Integrity');
+
+            // Path 2 (Invalid)
+            const n_st_p = createNode('st_p', 0, -3, 4, 0xe53e3e, 'Different State S_t\'', 'Replay or Context Mismatch');
+            const n_mt_p = createNode('mt_p', 5, -3, 4, 0xe53e3e, 'M_t\' = H(S_t\') || L_t', 'Bound to Invalid Context');
+            const n_rej = createNode('rej', 10, -3, 4, 0xe53e3e, 'REJECT', 'Integrity Failure');
+
+            // Connections
+            setupStream(n_dt, n_ht, 0x00d2ff);
+            setupStream(n_ht, n_lt, 0x00d2ff);
+            
+            // Branch from L_t
+            setupStream(n_lt, n_st, 0x38a169, 'valid');
+            setupStream(n_st, n_mt, 0x38a169, 'valid');
+            setupStream(n_mt, n_acc, 0x38a169, 'valid');
+
+            setupStream(n_lt, n_st_p, 0xe53e3e, 'invalid');
+            setupStream(n_st_p, n_mt_p, 0xe53e3e, 'invalid');
+            setupStream(n_mt_p, n_rej, 0xe53e3e, 'invalid');
+        }
+
+        function setupStream(from, to, color, type = 'always') {
+            const points = [from.position, to.position];
+            const mesh = new THREE.Line(
+                new THREE.BufferGeometry().setFromPoints(points),
+                new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.1 })
+            );
+            scene.add(mesh);
+
+            for (let i = 0; i < 5; i++) {
+                const p = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.06, 8, 8),
+                    new THREE.MeshBasicMaterial({ color })
+                );
+                scene.add(p);
+                streams.push({
+                    mesh: p,
+                    start: from.position.clone(),
+                    end: to.position.clone(),
+                    progress: Math.random(),
+                    speed: 0.005 + Math.random() * 0.01,
+                    type: type
+                });
+            }
+        }
+
+        function setPath(path) {
+            activePath = path;
+            document.getElementById('btn-valid').className = path === 'valid' ? 'btn active' : 'btn';
+            document.getElementById('btn-invalid').className = path === 'invalid' ? 'btn error' : 'btn';
+            
+            // Adjust camera view
+            if (path === 'valid') {
+                camera.position.lerp(new THREE.Vector3(0, 10, 15), 0.5);
+            } else {
+                camera.position.lerp(new THREE.Vector3(0, -10, 15), 0.5);
+            }
+        }
+
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(nodes);
+            const label = document.getElementById('label');
+            if (intersects.length > 0) {
+                const d = intersects[0].object.userData;
+                label.style.display = 'block';
+                label.style.left = event.clientX + 'px';
+                label.style.top = event.clientY + 'px';
+                label.innerHTML = `<strong>${d.label}</strong><br><small>${d.formula}</small>`;
+                document.body.style.cursor = 'pointer';
+            } else {
+                label.style.display = 'none';
+                document.body.style.cursor = 'default';
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            streams.forEach(s => {
+                const visible = s.type === 'always' || s.type === activePath;
+                s.mesh.visible = visible;
+                if (visible) {
+                    s.progress += s.speed;
+                    if (s.progress > 1) s.progress = 0;
+                    s.mesh.position.lerpVectors(s.start, s.end, s.progress);
+                }
+            });
+            nodes.forEach(n => {
+                n.rotation.y += 0.01;
+                n.material.emissiveIntensity = (n.userData.id.startsWith('st_p') && activePath === 'invalid') || (n.userData.id.startsWith('st') && activePath === 'valid') ? 1.0 : 0.3;
+            });
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>

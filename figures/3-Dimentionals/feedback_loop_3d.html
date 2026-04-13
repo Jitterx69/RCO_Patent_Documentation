@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback-Coupled System Dynamics - RCO 3D Loop</title>
+    <style>
+        body { margin: 0; background-color: #000810; overflow: hidden; font-family: 'Inter', sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; }
+        .ui {
+            position: absolute;
+            top: 25px;
+            width: 100%;
+            text-align: center;
+            color: #00d2ff;
+            pointer-events: none;
+        }
+        .title { font-size: 24px; font-weight: bold; text-shadow: 0 0 10px rgba(0, 210, 255, 0.5); }
+        .equation {
+            position: absolute;
+            bottom: 40px;
+            width: 100%;
+            text-align: center;
+            color: #38a169;
+            font-size: 20px;
+            font-family: 'Courier New', Courier, monospace;
+            background: rgba(0, 20, 30, 0.6);
+            padding: 10px 0;
+            pointer-events: none;
+        }
+        .label {
+            position: absolute;
+            background: rgba(0, 10, 20, 0.9);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #00d2ff;
+            font-size: 13px;
+            pointer-events: none;
+            display: none;
+            transform: translate(-50%, -100%);
+            z-index: 10;
+        }
+        .controls {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .btn {
+            background: rgba(0, 40, 80, 0.5);
+            color: #00d2ff;
+            border: 1px solid #00d2ff;
+            padding: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+        .btn:hover { background: #00d2ff; color: #000; }
+        .btn.error { border-color: #e53e3e; color: #e53e3e; }
+    </style>
+</head>
+<body>
+    <div class="ui"><div class="title">RCO: CLOSED-LOOP SYSTEM DYNAMICS</div></div>
+    <div id="label" class="label"></div>
+    <div class="equation">S_{t+1} = F(S_t, D_t^{validated})</div>
+    
+    <div class="controls">
+        <button class="btn" onclick="triggerEvent(true)">GENERATE VALID TELEMETRY</button>
+        <button class="btn error" onclick="triggerEvent(false)">INJECT INVALID ATTACK</button>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        let scene, camera, renderer, controls, raycaster, mouse;
+        const nodes = [];
+        const lightStreams = [];
+        let loopPath;
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 5, 25);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            const ambient = new THREE.AmbientLight(0x404040, 2);
+            scene.add(ambient);
+            const point = new THREE.PointLight(0xffffff, 2, 100);
+            point.position.set(10, 20, 10);
+            scene.add(point);
+
+            buildLoop();
+            animate();
+
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+            window.addEventListener('mousemove', onMouseMove);
+        }
+
+        function createNode(id, x, y, z, color, label, formula) {
+            const geom = (id === 'rco') ? new THREE.OctahedronGeometry(1.2, 2) : new THREE.SphereGeometry(1, 32, 32);
+            const mat = new THREE.MeshPhongMaterial({ color, emissive: color, emissiveIntensity: 0.2, transparent: true, opacity: 0.95 });
+            const mesh = new THREE.Mesh(geom, mat);
+            mesh.position.set(x, y, z);
+            mesh.userData = { id, label, formula };
+            scene.add(mesh);
+            nodes.push(mesh);
+            return mesh;
+        }
+
+        function buildLoop() {
+            // Main Circle of nodes
+            const radius = 10;
+            const n_state = createNode('state', 0, radius, 0, 0x00d2ff, 'System State S_t', 'The current ground truth');
+            const n_tel   = createNode('tel', radius, 0, 0, 0xadb5bd, 'Observation D_t', 'Raw telemetry emission');
+            const n_rco   = createNode('rco', 0, -radius, 0, 0x5588ff, 'RCO Validation Gate', 'Enforcement of integrity constraints');
+            const n_trans = createNode('trans', -radius, 0, 0, 0x38a169, 'Transition Function F', 'Self-regulating state update');
+
+            // Curves for the loop
+            const createCurve = (start, end, mid) => new THREE.QuadraticBezierCurve3(start, mid, end);
+            
+            loopPath = {
+                state_to_tel: createCurve(n_state.position, n_tel.position, new THREE.Vector3(radius, radius, 0)),
+                tel_to_rco: createCurve(n_tel.position, n_rco.position, new THREE.Vector3(radius, -radius, 0)),
+                rco_to_trans: createCurve(n_rco.position, n_trans.position, new THREE.Vector3(-radius, -radius, 0)),
+                trans_to_state: createCurve(n_trans.position, n_state.position, new THREE.Vector3(-radius, radius, 0))
+            };
+
+            // Setup continuous streams
+            setupContinuousStream(loopPath.state_to_tel, 0x00d2ff);
+            setupContinuousStream(loopPath.tel_to_rco, 0xadb5bd);
+            setupContinuousStream(loopPath.rco_to_trans, 0x38a169);
+            setupContinuousStream(loopPath.trans_to_state, 0x38a169);
+
+            // Rejection Path
+            const n_rej = createNode('rej', 8, -12, 0, 0xe53e3e, 'Rejected Entry', 'Unauthorized state modification blocked');
+            n_rej.material.opacity = 0.4;
+            n_rej.scale.set(0.6, 0.6, 0.6);
+        }
+
+        function setupContinuousStream(curve, color) {
+            for(let i=0; i<6; i++) {
+                const p = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), new THREE.MeshBasicMaterial({ color }));
+                scene.add(p);
+                lightStreams.push({ mesh: p, curve, progress: Math.random(), speed: 0.003, type: 'steady' });
+            }
+        }
+
+        function triggerEvent(isValid) {
+            const rcoNode = nodes.find(n => n.userData.id === 'rco');
+            const rejNode = nodes.find(n => n.userData.id === 'rej');
+            
+            if (!isValid) {
+                // Flash RCO Gate red
+                rcoNode.material.emissive.setHex(0xe53e3e);
+                rcoNode.material.emissiveIntensity = 2;
+                
+                // Blast a red particle out of the loop
+                const p = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), new THREE.MeshBasicMaterial({ color: 0xe53e3e }));
+                scene.add(p);
+                const startT = Date.now();
+                const interval = setInterval(() => {
+                    const t = (Date.now() - startT) / 500;
+                    if (t >= 1) {
+                        scene.remove(p);
+                        clearInterval(interval);
+                        rcoNode.material.emissive.setHex(0x5588ff);
+                        rcoNode.material.emissiveIntensity = 0.2;
+                    } else {
+                        p.position.lerpVectors(rcoNode.position, rejNode.position, t);
+                    }
+                }, 16);
+            } else {
+                // Flash RCO Gate green
+                rcoNode.material.emissive.setHex(0x38a169);
+                rcoNode.material.emissiveIntensity = 2;
+                setTimeout(() => {
+                    rcoNode.material.emissive.setHex(0x5588ff);
+                    rcoNode.material.emissiveIntensity = 0.2;
+                }, 300);
+            }
+        }
+
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(nodes);
+            const label = document.getElementById('label');
+            if (intersects.length > 0) {
+                const d = intersects[0].object.userData;
+                label.style.display = 'block';
+                label.style.left = event.clientX + 'px';
+                label.style.top = event.clientY + 'px';
+                label.innerHTML = `<strong>${d.label}</strong><br><small>${d.formula}</small>`;
+                document.body.style.cursor = 'pointer';
+            } else {
+                label.style.display = 'none';
+                document.body.style.cursor = 'default';
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            lightStreams.forEach(s => {
+                s.progress += s.speed;
+                if (s.progress > 1) s.progress = 0;
+                s.mesh.position.copy(s.curve.getPoint(s.progress));
+            });
+            nodes.forEach(n => {
+                n.rotation.y += 0.01;
+                n.rotation.x += 0.005;
+            });
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>

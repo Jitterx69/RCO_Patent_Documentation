@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lineage Chain: Recursive Cryptographic Dependency</title>
+    <style>
+        body { margin: 0; background-color: #000a12; overflow: hidden; font-family: 'Inter', sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; }
+        .label {
+            position: absolute;
+            color: #ffffff;
+            background: rgba(0, 15, 30, 0.9);
+            padding: 10px 15px;
+            border-radius: 6px;
+            border: 1px solid #ff4444;
+            pointer-events: none;
+            font-size: 14px;
+            transform: translate(-50%, -100%);
+            display: none;
+            box-shadow: 0 0 20px rgba(255, 68, 68, 0.4);
+            z-index: 10;
+        }
+        .ui {
+            position: absolute;
+            top: 25px;
+            width: 100%;
+            text-align: center;
+            color: #00d2ff;
+            font-size: 20px;
+            font-weight: bold;
+            letter-spacing: 1.5px;
+            pointer-events: none;
+            text-shadow: 0 0 10px rgba(0, 210, 255, 0.5);
+        }
+        .tamper-btn {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: #e53e3e;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 0 20px rgba(229, 62, 62, 0.5);
+            transition: all 0.3s;
+        }
+        .tamper-btn:hover { background: #ff5555; transform: translateX(-50%) scale(1.05); }
+    </style>
+</head>
+<body>
+    <div class="ui">RECURSIVE LINEAGE CHAIN STABILITY</div>
+    <div id="label" class="label"></div>
+    <button id="tamper-btn" class="tamper-btn">SIMULATE TAMPER (CHANGE H_1)</button>
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        let scene, camera, renderer, controls, raycaster, mouse;
+        const nodes = [];
+        const edges = [];
+        let isTampered = false;
+
+        const CHAIN_DATA = [
+            { id: 'l0', type: 'state', label: 'L_0 (Genesis)', x: -12, y: 0, z: 0 },
+            { id: 'h1', type: 'input', label: 'H_1 Input', x: -8, y: 4, z: 0 },
+            { id: 'l1', type: 'state', label: 'L_1 = H(H_1 || L_0)', x: -6, y: 0, z: 0 },
+            { id: 'h2', type: 'input', label: 'H_2 Input', x: -2, y: 4, z: 0 },
+            { id: 'l2', type: 'state', label: 'L_2 = H(H_2 || L_1)', x: 0, y: 0, z: 0 },
+            { id: 'h3', type: 'input', label: 'H_3 Input', x: 4, y: 4, z: 0 },
+            { id: 'l3', type: 'state', label: 'L_3 = H(H_3 || L_2)', x: 6, y: 0, z: 0 }
+        ];
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 10, 25);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            const ambient = new THREE.AmbientLight(0x404040, 2);
+            scene.add(ambient);
+            const point = new THREE.PointLight(0xffffff, 1);
+            point.position.set(10, 10, 10);
+            scene.add(point);
+
+            createNodes();
+            createEdges();
+
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            window.addEventListener('mousemove', onMouseMove);
+            document.getElementById('tamper-btn').addEventListener('click', triggerTamper);
+        }
+
+        function createNodes() {
+            CHAIN_DATA.forEach(data => {
+                const geom = data.type === 'input' ? new THREE.IcosahedronGeometry(0.6, 1) : new THREE.SphereGeometry(0.8, 32, 32);
+                const mat = new THREE.MeshPhongMaterial({
+                    color: 0x00d2ff,
+                    emissive: 0x00d2ff,
+                    emissiveIntensity: 0.4,
+                    shininess: 100
+                });
+                const node = new THREE.Mesh(geom, mat);
+                node.position.set(data.x, data.y, data.z);
+                node.userData = data;
+                scene.add(node);
+                nodes.push(node);
+            });
+        }
+
+        function createEdges() {
+            const addEdge = (fromId, toId) => {
+                const from = nodes.find(n => n.userData.id === fromId);
+                const to = nodes.find(n => n.userData.id === toId);
+                
+                const points = [from.position, to.position];
+                const geom = new THREE.BufferGeometry().setFromPoints(points);
+                const mat = new THREE.LineBasicMaterial({ color: 0x00d2ff, transparent: true, opacity: 0.3 });
+                const line = new THREE.Line(geom, mat);
+                
+                scene.add(line);
+                edges.push({ mesh: line, from: fromId, to: toId });
+            };
+
+            addEdge('l0', 'l1');
+            addEdge('h1', 'l1');
+            addEdge('l1', 'l2');
+            addEdge('h2', 'l2');
+            addEdge('l2', 'l3');
+            addEdge('h3', 'l3');
+        }
+
+        function triggerTamper() {
+            if (isTampered) return;
+            isTampered = true;
+            
+            const h1 = nodes.find(n => n.userData.id === 'h1');
+            const l1 = nodes.find(n => n.userData.id === 'l1');
+            const l2 = nodes.find(n => n.userData.id === 'l2');
+            const l3 = nodes.find(n => n.userData.id === 'l3');
+
+            const cascade = [
+                { node: h1, delay: 0 },
+                { node: l1, delay: 500 },
+                { node: l2, delay: 1000 },
+                { node: l3, delay: 1500 }
+            ];
+
+            cascade.forEach(item => {
+                setTimeout(() => {
+                    item.node.material.color.setHex(0xff0000);
+                    item.node.material.emissive.setHex(0xff0000);
+                    item.node.material.emissiveIntensity = 1.0;
+                    
+                    // Highlight downstream edges in red
+                    edges.forEach(edge => {
+                        if (edge.from === item.node.userData.id || edge.to === item.node.userData.id) {
+                            edge.mesh.material.color.setHex(0xff0000);
+                            edge.mesh.material.opacity = 0.8;
+                        }
+                    });
+                }, item.delay);
+            });
+        }
+
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(nodes);
+            
+            const label = document.getElementById('label');
+            if (intersects.length > 0) {
+                const data = intersects[0].object.userData;
+                label.style.display = 'block';
+                label.style.left = event.clientX + 'px';
+                label.style.top = event.clientY + 'px';
+                label.innerHTML = `<strong>${data.label}</strong><br><small>${isTampered && data.id !== 'l0' ? 'TAMPERED / INVALID' : 'Integrity Verified'}</small>`;
+                if (isTampered && data.id !== 'l0') label.style.borderColor = '#ff4444';
+                else label.style.borderColor = '#00d2ff';
+            } else {
+                label.style.display = 'none';
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            nodes.forEach(node => {
+                node.rotation.y += 0.01;
+                const time = Date.now() * 0.002;
+                node.position.y += Math.sin(time + node.position.x) * 0.005;
+            });
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        init();
+        animate();
+    </script>
+</body>
+</html>

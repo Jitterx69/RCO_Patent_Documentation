@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validation Timing Comparison - RCO 3D Visualization</title>
+    <style>
+        body { margin: 0; background-color: #000c18; overflow: hidden; font-family: 'Inter', sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; }
+        .ui {
+            position: absolute;
+            top: 25px;
+            width: 100%;
+            text-align: center;
+            color: #00d2ff;
+            pointer-events: none;
+        }
+        .title { font-size: 24px; font-weight: bold; text-shadow: 0 0 10px rgba(0, 210, 255, 0.5); }
+        .comparison-label {
+            position: absolute;
+            top: 100px;
+            width: 100%;
+            text-align: center;
+            color: #ffffff;
+            font-size: 18px;
+            letter-spacing: 2px;
+            opacity: 0.8;
+            pointer-events: none;
+        }
+        .labels {
+            position: absolute;
+            bottom: 40px;
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            color: #fff;
+            pointer-events: none;
+        }
+        .label-box {
+            padding: 15px 30px;
+            background: rgba(0, 20, 40, 0.6);
+            border: 1px solid #00d2ff;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .label-box.trad { border-color: #e53e3e; box-shadow: 0 0 15px rgba(229, 62, 62, 0.3); }
+        .label-box.rco { border-color: #38a169; box-shadow: 0 0 15px rgba(56, 161, 105, 0.3); }
+        .btn-panel {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .btn {
+            background: rgba(0, 40, 80, 0.7);
+            color: #00d2ff;
+            border: 1px solid #00d2ff;
+            padding: 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+        .btn:hover { background: #00d2ff; color: #000; }
+    </style>
+</head>
+<body>
+    <div class="ui">
+        <div class="title">RCO VS TRADITIONAL: VALIDATION TIMING</div>
+    </div>
+    <div class="comparison-label">PRE-INGESTION ENFORCEMENT VS POST-INGESTION DETECTION</div>
+    
+    <div class="labels">
+        <div class="label-box trad">TRADITIONAL SYSTEM<br><small>Validation AFTER Ingestion</small></div>
+        <div class="label-box rco">RCO PROTOCOL<br><small>Validation BEFORE Ingestion</small></div>
+    </div>
+
+    <div class="btn-panel">
+        <button class="btn" onclick="injectData(true)">INJECT VALID DATA</button>
+        <button class="btn" style="border-color: #e53e3e; color: #e53e3e;" onclick="injectData(false)">INJECT INVALID DATA</button>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        let scene, camera, renderer, controls;
+        const streams = [];
+        const nodes = [];
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 5, 25);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            const ambient = new THREE.AmbientLight(0x404040, 3);
+            scene.add(ambient);
+            const point = new THREE.PointLight(0xffffff, 2, 100);
+            point.position.set(10, 20, 10);
+            scene.add(point);
+
+            buildSystems();
+            animate();
+        }
+
+        function createNode(x, y, z, color, label, isBox=false) {
+            const geom = isBox ? new THREE.BoxGeometry(1.5, 1.5, 1) : new THREE.SphereGeometry(1, 32, 32);
+            const mat = new THREE.MeshPhongMaterial({ color, emissive: color, emissiveIntensity: 0.2 });
+            const mesh = new THREE.Mesh(geom, mat);
+            mesh.position.set(x, y, z);
+            scene.add(mesh);
+            nodes.push(mesh);
+            return mesh;
+        }
+
+        function buildSystems() {
+            // TRADITIONAL (LEFT -X)
+            const tx = -8;
+            const t_in = createNode(tx, 6, 0, 0x00d2ff, 'Input');
+            const t_db = createNode(tx, 0, 0, 0xe53e3e, 'Storage', true);
+            const t_val = createNode(tx, -6, 0, 0x444444, 'Detection');
+
+            // RCO (RIGHT +X)
+            const rx = 8;
+            const r_in = createNode(rx, 6, 0, 0x00d2ff, 'Input');
+            const r_pipe = createNode(rx, 2, 0, 0x00d2ff, 'RCO Pipeline', true);
+            const r_db = createNode(rx, -4, 0, 0x38a169, 'Verified Storage', true);
+            const r_rej = createNode(rx+3, 1, 0, 0xe53e3e, 'Rejected');
+            r_rej.visible = false;
+
+            // Connectors
+            setupPath(t_db, t_val, 0xe53e3e);
+            setupPath(r_in, r_pipe, 0x00d2ff);
+            setupPath(r_pipe, r_db, 0x38a169);
+
+            window.systemNodes = { t_in, t_db, r_in, r_pipe, r_db, r_rej };
+        }
+
+        function setupPath(from, to, color) {
+            const points = [from.position, to.position];
+            const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({ color, opacity: 0.1, transparent: true }));
+            scene.add(line);
+        }
+
+        function injectData(isValid) {
+            const color = isValid ? 0x38a169 : 0xe53e3e;
+            
+            // Traditional Flow
+            createParticle(window.systemNodes.t_in.position, window.systemNodes.t_db.position, color, 1000, () => {
+                if (!isValid) {
+                    window.systemNodes.t_db.material.emissiveIntensity = 2;
+                    setTimeout(() => window.systemNodes.t_db.material.emissiveIntensity = 0.2, 500);
+                }
+            });
+
+            // RCO Flow
+            createParticle(window.systemNodes.r_in.position, window.systemNodes.r_pipe.position, color, 500, () => {
+                if (isValid) {
+                    createParticle(window.systemNodes.r_pipe.position, window.systemNodes.r_db.position, color, 500);
+                } else {
+                    const target = window.systemNodes.r_rej.position;
+                    createParticle(window.systemNodes.r_pipe.position, target, 0xe53e3e, 300, null, true);
+                }
+            });
+        }
+
+        function createParticle(start, end, color, duration, callback, fadeOut=false) {
+            const p = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), new THREE.MeshBasicMaterial({ color }));
+            scene.add(p);
+            
+            const startT = Date.now();
+            const interval = setInterval(() => {
+                const elapsed = Date.now() - startT;
+                let t = elapsed / duration;
+                if (t >= 1) {
+                    scene.remove(p);
+                    clearInterval(interval);
+                    if (callback) callback();
+                } else {
+                    p.position.lerpVectors(start, end, t);
+                    if (fadeOut) p.material.opacity = 1 - t;
+                }
+            }, 16);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            nodes.forEach(n => n.rotation.y += 0.01);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>

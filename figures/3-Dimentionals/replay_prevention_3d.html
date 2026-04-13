@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Replay Attack Resistance - RCO Visualization</title>
+    <style>
+        body { margin: 0; background-color: #000810; overflow: hidden; font-family: 'Inter', sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; }
+        .ui {
+            position: absolute;
+            top: 25px;
+            width: 100%;
+            text-align: center;
+            color: #00d2ff;
+            pointer-events: none;
+        }
+        .title { font-size: 22px; font-weight: bold; text-shadow: 0 0 10px rgba(0, 210, 255, 0.5); }
+        .label {
+            position: absolute;
+            background: rgba(0, 10, 20, 0.9);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #00d2ff;
+            font-size: 13px;
+            pointer-events: none;
+            display: none;
+            transform: translate(-50%, -100%);
+            z-index: 10;
+        }
+        .controls {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+        }
+        .btn {
+            background: rgba(0, 40, 80, 0.5);
+            color: #00d2ff;
+            border: 1px solid #00d2ff;
+            padding: 12px 24px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .btn:hover { background: #00d2ff; color: #000; }
+        .btn.attack { border-color: #e53e3e; color: #e53e3e; }
+        .btn.attack:hover { background: #e53e3e; color: #fff; }
+    </style>
+</head>
+<body>
+    <div class="ui">
+        <div class="title">REPLAY ATTACK RESISTANCE: LINEAGE DIVERGENCE</div>
+    </div>
+    <div id="label" class="label"></div>
+    <div class="controls">
+        <button class="btn" onclick="triggerFlow('valid')">PATH A: ORIGINAL EXECUTION</button>
+        <button class="btn attack" onclick="triggerFlow('replay')">PATH B: REPLAY ATTEMPT</button>
+    </div>
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        let scene, camera, renderer, controls, raycaster, mouse;
+        const nodes = [];
+        const lightStreams = [];
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 10, 25);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            const ambient = new THREE.AmbientLight(0x404040, 2);
+            scene.add(ambient);
+            const point = new THREE.PointLight(0xffffff, 1.5, 100);
+            point.position.set(10, 10, 10);
+            scene.add(point);
+
+            buildScene();
+            animate();
+
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+            window.addEventListener('mousemove', onMouseMove);
+        }
+
+        function createNode(id, x, y, z, color, label, formula) {
+            const geom = new THREE.BoxGeometry(1, 1, 1);
+            const mat = new THREE.MeshPhongMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
+            const mesh = new THREE.Mesh(geom, mat);
+            mesh.position.set(x, y, z);
+            mesh.userData = { id, label, formula };
+            scene.add(mesh);
+            nodes.push(mesh);
+            return mesh;
+        }
+
+        function buildScene() {
+            // Shared Start
+            const n_dt = createNode('dt', -15, 0, 0, 0x00d2ff, 'D_t (Telemetry Input)', 'Identical bits in both cases');
+            const n_ht = createNode('ht', -10, 0, 0, 0x00d2ff, 'H_t', 'H_t = CanonicalHash(D_t)');
+
+            // Path 1: Valid Context
+            const n_lt = createNode('lt', -2, 4, 0, 0x38a169, 'L_t (Correct Lineage)', 'L_t = H(H_t || L_{t-1})');
+            const n_mt = createNode('mt', 6, 4, 0, 0x38a169, 'M_t (Valid Message)', 'Integrity Verified');
+            const n_acc = createNode('acc', 14, 4, 0, 0x38a169, 'ACCEPT', 'Original execution');
+
+            // Path 2: Replay Context
+            const n_lt_p = createNode('lt_p', -2, -4, 0, 0xe53e3e, 'L_t\' (Stale Context)', 'L_t\' = H(H_t || L\'_{t-1})');
+            const n_mt_p = createNode('mt_p', 6, -4, 0, 0xe53e3e, 'M_t\' (Invalid Bind)', 'Temporal mismatch');
+            const n_rej = createNode('rej', 14, -4, 0, 0xe53e3e, 'REJECT', 'Replay detected via lineage');
+
+            // Visual Link
+            const curve = new THREE.CubicBezierCurve3(
+                n_ht.position,
+                new THREE.Vector3(-6, 0, 0),
+                new THREE.Vector3(-4, 4, 0),
+                n_lt.position
+            );
+            const curve2 = new THREE.CubicBezierCurve3(
+                n_ht.position,
+                new THREE.Vector3(-6, 0, 0),
+                new THREE.Vector3(-4, -4, 0),
+                n_lt_p.position
+            );
+
+            setupStream(n_dt, n_ht, 0x00d2ff);
+            setupStreamWithCurve(curve, 0x38a169, 'valid');
+            setupStream(n_lt, n_mt, 0x38a169, 'valid');
+            setupStream(n_mt, n_acc, 0x38a169, 'valid');
+
+            setupStreamWithCurve(curve2, 0xe53e3e, 'replay');
+            setupStream(n_lt_p, n_mt_p, 0xe53e3e, 'replay');
+            setupStream(n_mt_p, n_rej, 0xe53e3e, 'replay');
+        }
+
+        function setupStream(from, to, color, type='always') {
+            const count = 5;
+            for (let i = 0; i < count; i++) {
+                const p = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), new THREE.MeshBasicMaterial({ color }));
+                scene.add(p);
+                lightStreams.push({ mesh: p, start: from.position, end: to.position, progress: Math.random(), speed: 0.005, type, active: false });
+            }
+        }
+
+        function setupStreamWithCurve(curve, color, type) {
+            for (let i = 0; i < 5; i++) {
+                const p = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), new THREE.MeshBasicMaterial({ color }));
+                scene.add(p);
+                lightStreams.push({ mesh: p, curve, progress: Math.random(), speed: 0.005, type, active: false });
+            }
+        }
+
+        function triggerFlow(type) {
+            lightStreams.forEach(s => {
+                if (s.type === 'always' || s.type === type) {
+                    s.active = true;
+                    s.progress = 0;
+                } else {
+                    s.active = false;
+                }
+            });
+            
+            // Flash effect for divergence
+            const n_ht = nodes.find(n => n.userData.id === 'ht');
+            n_ht.material.emissiveIntensity = 2.0;
+            setTimeout(() => n_ht.material.emissiveIntensity = 0.3, 200);
+        }
+
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(nodes);
+            const label = document.getElementById('label');
+            if (intersects.length > 0) {
+                const d = intersects[0].object.userData;
+                label.style.display = 'block';
+                label.style.left = event.clientX + 'px';
+                label.style.top = event.clientY + 'px';
+                label.innerHTML = `<strong>${d.label}</strong><br><small>${d.formula}</small>`;
+                document.body.style.cursor = 'pointer';
+            } else {
+                label.style.display = 'none';
+                document.body.style.cursor = 'default';
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            lightStreams.forEach(s => {
+                if (!s.active) { s.mesh.visible = false; return; }
+                s.mesh.visible = true;
+                s.progress += s.speed;
+                if (s.progress > 1) s.progress = 0;
+                
+                if (s.curve) {
+                    s.mesh.position.copy(s.curve.getPoint(s.progress));
+                } else {
+                    s.mesh.position.lerpVectors(s.start, s.end, s.progress);
+                }
+            });
+            nodes.forEach(n => n.rotation.y += 0.01);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>

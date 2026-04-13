@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed RCO Deployment Topology - 3D Visualization</title>
+    <style>
+        body { margin: 0; background-color: #000c18; overflow: hidden; font-family: 'Inter', sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; }
+        .ui {
+            position: absolute;
+            top: 25px;
+            width: 100%;
+            text-align: center;
+            color: #00d2ff;
+            pointer-events: none;
+        }
+        .title { font-size: 24px; font-weight: bold; text-shadow: 0 0 10px rgba(0, 210, 255, 0.5); }
+        .region-labels {
+            position: absolute;
+            top: 80px;
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            color: #88aacc;
+            font-size: 14px;
+            letter-spacing: 2px;
+            pointer-events: none;
+        }
+        .label {
+            position: absolute;
+            background: rgba(0, 10, 20, 0.9);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #00d2ff;
+            font-size: 13px;
+            pointer-events: none;
+            display: none;
+            transform: translate(-50%, -100%);
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div class="ui"><div class="title">DISTRIBUTED RCO TOPOLOGY (CLOUD + EDGE)</div></div>
+    <div class="region-labels">
+        <span>EDGE REGION</span>
+        <span style="margin-left: 200px;">CLOUD CLUSTER</span>
+    </div>
+    <div id="label" class="label"></div>
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        let scene, camera, renderer, controls, raycaster, mouse;
+        const nodes = [];
+        const lightStreams = [];
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 15, 30);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            const ambient = new THREE.AmbientLight(0x404040, 2);
+            scene.add(ambient);
+            const point = new THREE.PointLight(0xffffff, 1.5, 100);
+            point.position.set(10, 20, 10);
+            scene.add(point);
+
+            // Ground planes for regions
+            const regionGeom = new THREE.PlaneGeometry(20, 40);
+            const edgeMat = new THREE.MeshPhongMaterial({ color: 0x112233, transparent: true, opacity: 0.15, side: THREE.DoubleSide });
+            const cloudMat = new THREE.MeshPhongMaterial({ color: 0x003366, transparent: true, opacity: 0.15, side: THREE.DoubleSide });
+            
+            const edgePlane = new THREE.Mesh(regionGeom, edgeMat);
+            edgePlane.rotation.x = -Math.PI/2;
+            edgePlane.position.x = -15;
+            scene.add(edgePlane);
+
+            const cloudPlane = new THREE.Mesh(regionGeom, cloudMat);
+            cloudPlane.rotation.x = -Math.PI/2;
+            cloudPlane.position.x = 10;
+            scene.add(cloudPlane);
+
+            buildTopology();
+            animate();
+
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+            window.addEventListener('mousemove', onMouseMove);
+        }
+
+        function createNode(id, x, y, z, color, label, formula) {
+            const geom = new THREE.BoxGeometry(1.2, 1.2, 1.2);
+            const mat = new THREE.MeshPhongMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
+            const mesh = new THREE.Mesh(geom, mat);
+            mesh.position.set(x, y, z);
+            mesh.userData = { id, label, formula };
+            scene.add(mesh);
+            nodes.push(mesh);
+            return mesh;
+        }
+
+        function buildTopology() {
+            // Edge Layer
+            const e1 = createNode('e1', -18, 0, 8, 0x00d2ff, 'Sensor Node', 'Edge Producer');
+            const e2 = createNode('e2', -18, 0, 3, 0x00d2ff, 'IoT Device', 'Edge Producer');
+            const e3 = createNode('e3', -18, 0, -3, 0x00d2ff, 'Application', 'Edge Producer');
+            const e4 = createNode('e4', -18, 0, -8, 0x00d2ff, 'Edge Collector', 'Preprocessing Layer');
+
+            // Ingestion
+            const ingestion = createNode('ing', -5, 0, 0, 0x5588ff, 'Ingestion / API Gateway', 'Cloud Interface');
+
+            // Fabric
+            const vals = [];
+            for(let i=0; i<6; i++) {
+                const angle = (i/6) * Math.PI * 2;
+                const v = createNode('v'+i, 5 + Math.cos(angle)*4, 0, Math.sin(angle)*4, 0x00ffff, 'Validator '+i, 'Independent Verifier');
+                vals.push(v);
+            }
+
+            // Persistence
+            const storage = createNode('storage', 18, 0, 3, 0x38a169, 'Append-Only Audit Log', 'Immutable Persistence');
+            const query = createNode('query', 18, 0, -3, 0x38a169, 'Audit Query Service', 'Verification Interface');
+
+            // Streams
+            [e1, e2, e3, e4].forEach(e => setupStream(e, ingestion, 0x00d2ff));
+            vals.forEach(v => setupStream(ingestion, v, 0x5588ff));
+            vals.forEach(v => setupStream(v, storage, 0x38a169));
+            setupStream(storage, query, 0x38a169);
+        }
+
+        function setupStream(from, to, color) {
+            for(let i=0; i<3; i++) {
+                const p = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshBasicMaterial({ color }));
+                scene.add(p);
+                lightStreams.push({
+                    mesh: p,
+                    start: from.position,
+                    end: to.position,
+                    progress: Math.random(),
+                    speed: 0.003 + Math.random() * 0.005
+                });
+            }
+        }
+
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(nodes);
+            const label = document.getElementById('label');
+            if (intersects.length > 0) {
+                const d = intersects[0].object.userData;
+                label.style.display = 'block';
+                label.style.left = event.clientX + 'px';
+                label.style.top = event.clientY + 'px';
+                label.innerHTML = `<strong>${d.label}</strong><br><small>${d.formula}</small>`;
+                document.body.style.cursor = 'pointer';
+            } else {
+                label.style.display = 'none';
+                document.body.style.cursor = 'default';
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            lightStreams.forEach(s => {
+                s.progress += s.speed;
+                if (s.progress > 1) s.progress = 0;
+                s.mesh.position.lerpVectors(s.start, s.end, s.progress);
+            });
+            nodes.forEach(n => n.rotation.y += 0.01);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>

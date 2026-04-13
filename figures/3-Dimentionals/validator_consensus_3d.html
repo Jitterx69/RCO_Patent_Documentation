@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validator Consensus & Threshold Security - RCO Visualization</title>
+    <style>
+        body { margin: 0; background-color: #000c18; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; }
+        .ui {
+            position: absolute;
+            top: 25px;
+            width: 100%;
+            text-align: center;
+            color: #00d2ff;
+            pointer-events: none;
+        }
+        .title { font-size: 24px; font-weight: bold; text-shadow: 0 0 15px rgba(0, 210, 255, 0.5); }
+        .stats {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 20, 40, 0.8);
+            border: 1px solid #00d2ff;
+            padding: 20px;
+            border-radius: 12px;
+            color: #fff;
+            min-width: 200px;
+        }
+        .stat-item { margin-bottom: 10px; font-size: 14px; }
+        .stat-value { color: #00d2ff; font-weight: bold; float: right; }
+        .controls {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+        }
+        .btn {
+            background: rgba(0, 40, 80, 0.6);
+            color: #00d2ff;
+            border: 1px solid #00d2ff;
+            padding: 12px 24px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .btn:hover { background: #00d2ff; color: #000c18; }
+        .btn.danger { border-color: #e53e3e; color: #e53e3e; }
+        .btn.danger:hover { background: #e53e3e; color: #fff; }
+        #decision {
+            font-size: 20px;
+            margin-top: 20px;
+            padding: 10px;
+            text-align: center;
+            border-radius: 8px;
+            display: none;
+        }
+        .accept { background: rgba(56, 161, 105, 0.2); color: #38a169; border: 1px solid #38a169; }
+        .reject { background: rgba(229, 62, 62, 0.2); color: #e53e3e; border: 1px solid #e53e3e; }
+    </style>
+</head>
+<body>
+    <div class="ui">
+        <div class="title">DISTRIBUTED VALIDATOR CONSENSUS</div>
+    </div>
+    
+    <div class="stats">
+        <div class="stat-item">Honest Validators: <span class="stat-value" id="count-honest">5</span></div>
+        <div class="stat-item">Adversarial Validators: <span class="stat-value" id="count-adversarial">2</span></div>
+        <div class="stat-item">Threshold (t): <span class="stat-value">5</span></div>
+        <hr style="border-color: #004466;">
+        <div class="stat-item">Valid Sig Shares: <span class="stat-value" id="count-valid">0</span></div>
+        <div id="decision">ACCEPT</div>
+    </div>
+
+    <div class="controls">
+        <button class="btn" onclick="emitMessage()">EMIT MESSAGE M_t</button>
+        <button class="btn danger" onclick="toggleMalicious()">TOGGLE ATTACK (f=4)</button>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        let scene, camera, renderer, controls;
+        const validators = [];
+        const beams = [];
+        let numAdversarial = 2;
+        let isEmitting = false;
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(20, 15, 20);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            const ambient = new THREE.AmbientLight(0x404040, 2);
+            scene.add(ambient);
+            const point = new THREE.PointLight(0xffffff, 1.5, 100);
+            point.position.set(10, 20, 10);
+            scene.add(point);
+
+            setupScene();
+            animate();
+        }
+
+        function setupScene() {
+            // Central Aggregation Node
+            const aggGeom = new THREE.OctahedronGeometry(1.5, 2);
+            const aggMat = new THREE.MeshPhongMaterial({ color: 0x00d2ff, emissive: 0x00d2ff, emissiveIntensity: 0.5, wireframe: true });
+            const aggNode = new THREE.Mesh(aggGeom, aggMat);
+            aggNode.position.set(0, 0, 0);
+            scene.add(aggNode);
+
+            // Validator Ring
+            const radius = 12;
+            for (let i = 0; i < 7; i++) {
+                const angle = (i / 7) * Math.PI * 2;
+                const vx = radius * Math.cos(angle);
+                const vz = radius * Math.sin(angle);
+
+                const vGeom = new THREE.SphereGeometry(0.8, 32, 32);
+                const vMat = new THREE.MeshPhongMaterial({ color: 0x38a169 });
+                const vMesh = new THREE.Mesh(vGeom, vMat);
+                vMesh.position.set(vx, 0, vz);
+                vMesh.userData = { id: i, isAdversarial: false };
+                scene.add(vMesh);
+                validators.push(vMesh);
+
+                // Constant connection lines
+                const linePoints = [new THREE.Vector3(0,0,0), new THREE.Vector3(vx, 0, vz)];
+                const lineGeom = new THREE.BufferGeometry().setFromPoints(linePoints);
+                const lineMat = new THREE.LineBasicMaterial({ color: 0x00d2ff, transparent: true, opacity: 0.1 });
+                scene.add(new THREE.Line(lineGeom, lineMat));
+            }
+
+            updateValidatorColors();
+        }
+
+        function toggleMalicious() {
+            numAdversarial = numAdversarial === 2 ? 4 : 2;
+            updateValidatorColors();
+            const btn = document.querySelector('.btn.danger');
+            btn.innerText = numAdversarial === 4 ? "STOP ATTACK (f=2)" : "TOGGLE ATTACK (f=4)";
+            document.getElementById('count-honest').innerText = 7 - numAdversarial;
+            document.getElementById('count-adversarial').innerText = numAdversarial;
+        }
+
+        function updateValidatorColors() {
+            validators.forEach((v, i) => {
+                v.userData.isAdversarial = i < numAdversarial;
+                v.material.color.setHex(v.userData.isAdversarial ? 0xe53e3e : 0x38a169);
+                v.material.emissive.setHex(v.userData.isAdversarial ? 0xe53e3e : 0x38a169);
+            });
+        }
+
+        function emitMessage() {
+            if (isEmitting) return;
+            isEmitting = true;
+            document.getElementById('decision').style.display = 'none';
+            document.getElementById('count-valid').innerText = "0";
+
+            let validCount = 0;
+            const threshold = 5;
+
+            validators.forEach((v, i) => {
+                // Outbound Message Beam
+                createBeam(new THREE.Vector3(0,0,0), v.position, 0x00d2ff, 500);
+
+                // Response Signature Beam (Delayed)
+                setTimeout(() => {
+                    const color = v.userData.isAdversarial ? 0xff0000 : 0x00ff00;
+                    createBeam(v.position, new THREE.Vector3(0,0,0), color, 800);
+                    
+                    if (!v.userData.isAdversarial) {
+                        validCount++;
+                        document.getElementById('count-valid').innerText = validCount;
+                    }
+                }, 600);
+            });
+
+            setTimeout(() => {
+                const dec = document.getElementById('decision');
+                dec.style.display = 'block';
+                if (validCount >= threshold) {
+                    dec.innerText = "ACCEPT (Threshold Met)";
+                    dec.className = "accept";
+                } else {
+                    dec.innerText = "REJECT (Insufficient Trust)";
+                    dec.className = "reject";
+                }
+                isEmitting = false;
+            }, 1800);
+        }
+
+        function createBeam(start, end, color, duration) {
+            const beamPoints = [start, end];
+            const beamGeom = new THREE.BufferGeometry().setFromPoints(beamPoints);
+            const beamMat = new THREE.LineBasicMaterial({ color: color, linewidth: 3 });
+            const beamLine = new THREE.Line(beamGeom, beamMat);
+            scene.add(beamLine);
+
+            const startTime = Date.now();
+            const check = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                if (elapsed > duration) {
+                    scene.remove(beamLine);
+                    clearInterval(check);
+                } else {
+                    beamLine.material.opacity = 1 - (elapsed / duration);
+                    beamLine.material.transparent = true;
+                }
+            }, 16);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            validators.forEach(v => {
+                v.rotation.y += 0.05;
+                v.position.y = Math.sin(Date.now() * 0.002 + v.position.x) * 0.2;
+            });
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
