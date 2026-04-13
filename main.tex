@@ -1,80 +1,56 @@
-\documentclass[12pt,a4paper]{report}
+\begin{titlepage}
 
-\input{preamble/packages}
-\input{preamble/macros}
-\input{preamble/formatting}
+\begin{center}
 
-\begin{document}
+% ==============================
+% TITLE
+% ==============================
 
-\pagenumbering{arabic}
-\input{frontmatter/titlepage}
-\input{frontmatter/abstract}
-\input{frontmatter/acknowledgements}
-\input{frontmatter/definitions}
-\input{frontmatter/glossary}
+\vspace*{1cm}
 
-\newpage
-\tableofcontents
-\listoffigures
-\listoftables
+{\Huge \textbf{Feedback-Coupled Cryptographic Observation Protocol}}\\[0.5cm]
 
-\chapter{Executive Engineering Mandate}
-\input{chapters/01_executive_mandate}
+{\large \textbf{A Deterministic Integrity Framework for Feedback-Coupled Agentic Systems}}\\[1cm]
 
-\chapter{Cryptographic Core}
-\input{chapters/02_cryptographic_core}
+% ==============================
+% INVENTORS
+% ==============================
 
-\chapter{Zero-Trust Ingestion}
-\input{chapters/03_zero_trust_ingestion}
+\textbf{Inventors:}\\[0.5cm]
 
-\chapter{Formal Security Calculus}
-\input{chapters/04_security_calculus}
+Mohit Ranjan (Student Researcher)\\
+Dr. Ram Chandra Barik\\[1cm]
 
-\chapter{RCO-Lite Architecture}
-\input{chapters/05_rco_lite}
+% ==============================
+% KEYWORDS
+% ==============================
 
-\chapter{API \& SDK Specification}
-\input{chapters/06_api_reference}
+\textbf{Technical Field:}\\[0.3cm]
 
-\chapter{Minimal Working Example}
-\input{chapters/07_minimal_working_example}
+Cryptographic Telemetry Systems, Distributed Systems Integrity,\\
+Machine Learning Infrastructure, Zero-Trust Architectures\\[1cm]
 
-\chapter{Failure Mode Analysis}
-\input{chapters/08_fmea}
+% ==============================
+% DOCUMENT VERSION
+% ==============================
 
-\chapter{Infrastructure Profiles}
-\input{chapters/09_infrastructure_profiles}
+\textbf{Document Classification:}\\[0.3cm]
 
-\chapter{SRE Runbooks}
-\input{chapters/10_sre_runbooks}
+Technical Specification \& Patent Disclosure - 2026\\
+Version 1.0 (Submission Draft)\\[1cm]
 
-\chapter{Performance \& Cost Analysis}
-\input{chapters/11_performance_analysis}
+% ==============================
+% CONFIDENTIALITY NOTICE
+% ==============================
 
-\chapter{Theoretical Foundations}
-\input{chapters/12_theoretical_foundations}
+\begin{minipage}{0.85\textwidth}
+\small
+\textbf{Confidentiality Notice:} \\
+This document contains proprietary and confidential technical information related to the Feedback-Coupled Cryptographic Observation (RCO) Protocol. Unauthorized reproduction, distribution, or disclosure is strictly prohibited except as required for patent examination and legal review.
+\end{minipage}
 
-\chapter{Applications}
-\input{chapters/13_applications}
+\vfill
 
-\chapter{Claims and Novelty}
-\input{chapters/14_claims_and_novelty}
+\end{center}
 
-\newpage
-
-\chapter{Appendix A: Mathematic Proofs and Congnizitions}
-\input{appendices/appendix_a_math_proofs}
-
-\newpage
-\chapter{Appendix B: Code Listings and Algorithmic Approaches}
-\input{appendices/appendix_b_code_listings}
-
-\newpage
-\chapter{Appendix C: Protocol Constants}
-\input{appendices/appendix_c_protocol_constants}
-
-\nocite{*}
-\bibliographystyle{IEEEtran}
-\bibliography{bibliography/references}
-
-\end{document}
+\end{titlepage}

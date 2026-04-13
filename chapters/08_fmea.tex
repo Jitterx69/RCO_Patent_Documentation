@@ -2,6 +2,62 @@
 
 This section presents a comprehensive Failure Modes and Effects Analysis (FMEA) of the Feedback-Coupled Cryptographic Observation (RCO) protocol. The objective of this analysis is to identify, classify, and formally evaluate all potential failure modes that may arise within the system, quantify their impact on system integrity, and demonstrate that the protocol either prevents such failures or bounds their effects under well-defined assumptions.
 
+\begin{table}[htbp]
+\footnotesize
+\centering
+\caption{FMEA Summary of RCO Protocol Components and Failure Modes}
+\label{tab:fmea-summary}
+
+\renewcommand{\arraystretch}{1.25}
+
+\begin{tabularx}{\textwidth}{|p{2.8cm}|X|X|X|p{2cm}|p{2cm}|p{2cm}|}
+\hline
+\textbf{Component} & \textbf{Failure Mode} & \textbf{Cause} & \textbf{Effect on System} & \textbf{Severity} & \textbf{Detection} & \textbf{Mitigation} \\
+\hline
+
+Telemetry Producer & Malformed or adversarial data & Compromised device or faulty input & Invalid telemetry enters pipeline & High & Schema validation, hash mismatch & Reject at ingestion stage \\
+
+\hline
+
+Canonicalization Engine & Non-deterministic encoding & Inconsistent serialization rules & Hash inconsistency across validators & High & Cross-validator mismatch & Enforce strict canonical schema \\
+
+\hline
+
+Hashing Module & Weak or broken hash function & Poor algorithm choice or implementation flaw & Collision or tampering undetected & Critical & Verification inconsistencies & Use standard cryptographic hashes (SHA-2/3) \\
+
+\hline
+
+Lineage Engine & Broken chain or missing links & State loss or corruption & Loss of historical integrity & Critical & Lineage verification failure & Recompute lineage, reject chain \\
+
+\hline
+
+State Binding Module & Incorrect state association & State desynchronization or tampering & Replay or semantic forgery & Critical & Validation failure in PoR & Enforce deterministic state hashing \\
+
+\hline
+
+Validator Network & Malicious validator behavior & Node compromise or collusion & Invalid data approved & Critical & Signature inconsistency & Threshold enforcement ($f < t$) \\
+
+\hline
+
+Aggregation Layer & Incorrect signature aggregation & Faulty logic or corrupted inputs & False acceptance or rejection & High & Verification mismatch & Deterministic aggregation + re-verification \\
+
+\hline
+
+Verification Engine & Incorrect validation decision & Logic error or corrupted inputs & System integrity violation & Critical & Re-validation mismatch & Strict cryptographic verification \\
+
+\hline
+
+Persistence Layer & Data corruption or loss & Storage failure or attack & Loss of auditability & High & Integrity checks via lineage & Append-only storage + redundancy \\
+
+\hline
+
+Audit \& Query Service & Incorrect query results & Incomplete lineage or corrupted data & Misleading verification output & Medium & Recompute proofs & Cross-check with stored lineage \\
+
+\hline
+
+\end{tabularx}
+\end{table}
+
 Unlike conventional FMEA approaches that focus on mechanical or software component failures in isolation, the RCO protocol requires a multi-layered analysis that integrates cryptographic, distributed, and feedback-coupled system dynamics. In particular, failure must be defined not only in terms of component malfunction but also in terms of violation of system invariants.
 
 Let the system state be defined as:

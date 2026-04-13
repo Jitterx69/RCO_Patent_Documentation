@@ -2,6 +2,62 @@
 
 This section provides a comprehensive analysis of the performance characteristics of the RCO protocol. The goal is to quantify the computational, network, and storage overhead introduced by the protocol while demonstrating that these costs remain practical for real-world deployment.
 
+\begin{table}[htbp]
+\footnotesize
+\centering
+\caption{Performance Characteristics of RCO Pipeline Operations}
+\label{tab:performance}
+
+\renewcommand{\arraystretch}{1.25}
+
+\begin{tabularx}{\textwidth}{|p{3cm}|p{2.5cm}|p{2.5cm}|X|X|X|}
+\hline
+\textbf{Operation} & \textbf{Time Complexity} & \textbf{Space Complexity} & \textbf{Network Cost} & \textbf{Latency Characteristics} & \textbf{Notes} \\
+\hline
+
+Canonicalization & $O(|D_t|)$ & $O(|D_t|)$ & None & Low, local computation & Deterministic serialization dominates cost \\
+
+\hline
+
+Hashing & $O(|D_t|)$ & $O(1)$ & None & Low, CPU-bound & Linear in input size \\
+
+\hline
+
+Lineage Construction & $O(1)$ & $O(1)$ & None & Constant time & Depends only on previous hash \\
+
+\hline
+
+State Binding & $O(|S_t|)$ & $O(1)$ & None & Low, CPU-bound & Hashing of state representation \\
+
+\hline
+
+Validation Dispatch & $O(n)$ & $O(n)$ & Broadcast to $n$ validators & Network-bound & Parallelizable across validators \\
+
+\hline
+
+Validator Verification & $O(1)$ per node & $O(1)$ & None (local) & Parallel execution & Independent across validators \\
+
+\hline
+
+Signature Aggregation & $O(n)$ & $O(n)$ & Collection of $\sigma_i$ & Moderate, depends on $n$ & Can be optimized via tree aggregation \\
+
+\hline
+
+Final Verification & $O(1)$ & $O(1)$ & None & Low latency & Single signature verification \\
+
+\hline
+
+Persistence & $O(1)$ & $O(1)$ & Storage write & Moderate (I/O bound) & Depends on storage backend \\
+
+\hline
+
+End-to-End Pipeline & $O(|D_t| + n)$ & $O(n)$ & $O(n)$ messages & Network-dominated at scale & Parallelism reduces effective latency \\
+
+\hline
+
+\end{tabularx}
+\end{table}
+
 Unlike traditional systems that treat telemetry validation as an optional or asynchronous process, the RCO protocol integrates validation directly into the ingestion pipeline. As a result, performance analysis must consider both the cost of validation and the benefits of eliminating downstream inconsistencies, reprocessing, and error propagation.
 
 The performance of the system is evaluated across four primary dimensions: latency, throughput, resource utilization, and scalability.

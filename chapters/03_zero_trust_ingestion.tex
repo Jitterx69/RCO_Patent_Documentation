@@ -103,6 +103,66 @@ The global verification condition is defined as a threshold function:
 
 where $t$ is the acceptance threshold and $\mathbb{I}$ is the indicator function.
 
+\begin{table}[htbp]
+\footnotesize
+\centering
+\caption{Validator Model and Threshold Security Parameters in RCO}
+\label{tab:validator-model}
+
+\renewcommand{\arraystretch}{1.25}
+
+\begin{tabularx}{\textwidth}{|p{2.5cm}|p{2cm}|X|X|X|}
+\hline
+\textbf{Parameter} & \textbf{Symbol} & \textbf{Description} & \textbf{Constraint} & \textbf{Security Implication} \\
+\hline
+
+Total Validators & $n$ & Total number of validator nodes participating in verification & $n \geq 1$ & Defines system scale and redundancy \\
+
+\hline
+
+Threshold & $t$ & Minimum number of valid signatures required for acceptance & $1 \leq t \leq n$ & Controls acceptance strictness and fault tolerance \\
+
+\hline
+
+Adversarial Validators & $f$ & Number of malicious or compromised validators & $0 \leq f < t$ & System secure only if adversary below threshold \\
+
+\hline
+
+Honest Validators & $n - f$ & Validators following protocol correctly & $n - f \geq t$ & Ensures sufficient honest participation \\
+
+\hline
+
+Threshold Condition & --- & Acceptance rule for validation & $|\{\sigma_i\}| \geq t$ & Guarantees collective agreement \\
+
+\hline
+
+Security Bound & --- & Adversarial tolerance limit & $f < t$ & Prevents malicious majority from approving invalid data \\
+
+\hline
+
+Recommended Threshold & --- & Practical configuration for Byzantine tolerance & $t = \left\lfloor \frac{2n}{3} \right\rfloor + 1$ & Ensures Byzantine fault tolerance \\
+
+\hline
+
+Failure Condition & --- & System compromise scenario & $f \geq t$ & Invalid telemetry may be accepted \\
+
+\hline
+
+Signature Set & $\{\sigma_i\}$ & Set of partial signatures from validators & $|\{\sigma_i\}| \leq n$ & Inputs to aggregation \\
+
+\hline
+
+Aggregated Signature & $\Sigma_t$ & Combined signature from valid subset & Derived from $\{\sigma_i\}$ & Used for final verification \\
+
+\hline
+
+Verification Condition & --- & Acceptance condition for message $M_t$ & $\text{Verify}(\Sigma_t, M_t) = \text{true}$ & Ensures correctness of validation \\
+
+\hline
+
+\end{tabularx}
+\end{table}
+
 \section{Correctness of Threshold Verification}
 
 The threshold verification mechanism ensures that telemetry is accepted only if a sufficient number of independent validators agree on its validity.

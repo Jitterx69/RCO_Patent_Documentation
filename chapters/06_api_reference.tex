@@ -4,6 +4,70 @@ This section defines the formal application programming interface (API) and soft
 
 Unlike conventional API specifications that focus primarily on request-response formats, the RCO API is defined as a semantic contract. Each API operation is bound to protocol invariants and must preserve deterministic representation, lineage continuity, state consistency, and distributed verification guarantees. As a result, the API is not merely an interface layer but an extension of the protocol itself.
 
+\begin{table}[htbp]
+\footnotesize
+\centering
+\caption{RCO API Endpoint Summary}
+\label{tab:api-endpoints}
+
+\renewcommand{\arraystretch}{1.25}
+
+\begin{tabularx}{\textwidth}{|p{3cm}|p{1.8cm}|X|X|p{1.8cm}|X|}
+\hline
+\textbf{Endpoint} & \textbf{Method} & \textbf{Input Schema} & \textbf{Output Schema} & \textbf{Idempotent} & \textbf{Failure Modes} \\
+\hline
+
+\texttt{/v1/ingest} & POST & 
+\{\texttt{data}, \texttt{state}, \texttt{metadata}\} &
+\{\texttt{status}, \texttt{hash}, \texttt{lineage}, \texttt{proof}\} &
+No &
+Invalid input, signature failure, insufficient validator quorum \\
+
+\hline
+
+\texttt{/v1/verify} & POST &
+\{\texttt{message}, \texttt{proof}\} &
+\{\texttt{valid}, \texttt{details}\} &
+Yes &
+Malformed proof, signature mismatch \\
+
+\hline
+
+\texttt{/v1/lineage/\{id\}} & GET &
+Path parameter: \texttt{id} &
+\{\texttt{lineage\_chain}\} &
+Yes &
+Record not found, corrupted lineage \\
+
+\hline
+
+\texttt{/v1/stream} & POST / WS &
+\{\texttt{data\_stream}\} &
+\{\texttt{status}, \texttt{batch\_proofs}\} &
+No &
+Stream interruption, batch validation failure \\
+
+\hline
+
+\texttt{/v1/status/\{id\}} & GET &
+Path parameter: \texttt{id} &
+\{\texttt{status}, \texttt{timestamp}\} &
+Yes &
+Unknown identifier \\
+
+\hline
+
+\texttt{/v1/health} & GET &
+None &
+\{\texttt{status}, \texttt{uptime}\} &
+Yes &
+Service unavailable \\
+
+\hline
+
+\end{tabularx}
+\end{table}
+
 The SDK complements this API by abstracting complexity while preserving correctness. It provides developers with structured access to the protocol without requiring direct management of cryptographic primitives, validator coordination, or lineage tracking.
 
 \section{System Boundary Definition}
@@ -142,8 +206,6 @@ This is achieved through versioning and backward-compatible schema evolution.
 \section{Conclusion}
 
 This section establishes the foundational model for the RCO API and SDK. By defining entities, semantics, and interaction constraints in detail, it ensures that all external interactions with the system are consistent, verifiable, and aligned with protocol guarantees. This foundation supports the development of more specific endpoint definitions and SDK abstractions in subsequent sections.
-
-\section{Endpoint Specifications and Schema Definitions}
 
 \section{General API Conventions}
 
@@ -377,6 +439,66 @@ Large payloads exceeding size limits are rejected.
 Partial validator responses result in rejection if the threshold is not met.
 
 Network timeouts trigger retry logic but do not compromise correctness.
+
+\begin{table}[htbp]
+\footnotesize
+\centering
+\caption{RCO API Error Codes and Failure Semantics}
+\label{tab:error-codes}
+
+\renewcommand{\arraystretch}{1.25}
+
+\begin{tabularx}{\textwidth}{|p{2cm}|p{3cm}|X|X|X|}
+\hline
+\textbf{Code} & \textbf{Error Name} & \textbf{Description} & \textbf{System Action} & \textbf{Client Action} \\
+\hline
+
+400 & Invalid Input & Malformed or schema-invalid request payload & Request rejected before processing & Fix request format and retry \\
+
+\hline
+
+401 & Unauthorized & Missing or invalid authentication credentials & Request blocked at API gateway & Provide valid credentials \\
+
+\hline
+
+403 & Forbidden & Authenticated but not permitted for operation & Request denied & Check permissions \\
+
+\hline
+
+404 & Not Found & Requested resource or lineage ID does not exist & No processing performed & Verify identifier \\
+
+\hline
+
+409 & Conflict & Duplicate or conflicting ingestion request & Request rejected to maintain consistency & Avoid duplicate submissions \\
+
+\hline
+
+422 & Validation Failed & RCO validation failed (hash mismatch, state inconsistency, lineage error) & Telemetry rejected (not persisted) & Inspect diagnostics and correct data \\
+
+\hline
+
+429 & Rate Limited & Too many requests or ingestion overload & Request throttled & Retry with backoff \\
+
+\hline
+
+500 & Internal Error & Unexpected failure in processing pipeline & Processing aborted & Retry or contact support \\
+
+\hline
+
+502 & Validator Failure & Insufficient valid signatures or validator errors & Validation aborted & Retry after delay \\
+
+\hline
+
+503 & Service Unavailable & System temporarily unavailable (maintenance or overload) & Request not processed & Retry later \\
+
+\hline
+
+504 & Timeout & Validation or aggregation exceeded time limits & Request terminated & Retry with adjusted parameters \\
+
+\hline
+
+\end{tabularx}
+\end{table}
 
 \section{Schema Evolution}
 

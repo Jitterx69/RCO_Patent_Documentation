@@ -37,6 +37,62 @@ The oracle capability allows $\mathcal{A}$ to query the system for valid telemet
 
 Let $\mathcal{C} \subseteq \mathcal{V}$ denote the set of corrupted validators with $|\mathcal{C}| = f$.
 
+\begin{table}[htbp]
+\footnotesize
+\centering
+\caption{Threat Model and Adversarial Capabilities in the RCO Protocol}
+\label{tab:threat-model}
+
+\renewcommand{\arraystretch}{1.25}
+
+\begin{tabularx}{\textwidth}{|p{2.8cm}|X|p{2.5cm}|X|X|p{2.2cm}|}
+\hline
+\textbf{Attack Type} & \textbf{Description} & \textbf{Capability Required} & \textbf{Target Layer} & \textbf{Mitigation Mechanism} & \textbf{Residual Risk} \\
+\hline
+
+Replay Attack & Reuse of previously valid telemetry in a different temporal or state context & Access to historical $D_t$ or $M_t$ & Lineage / Validation & Lineage chaining $L_t$, state binding $M_t = \mathcal{H}(S_t) \parallel L_t$ & Negligible if hash assumptions hold \\
+
+\hline
+
+State Substitution & Injecting valid telemetry with altered system state & Control over $S_t$ representation & State Binding Layer & Proof of Reflexion enforcing state-data coupling & Limited to compromised state sources \\
+
+\hline
+
+Data Tampering & Modification of telemetry before or during ingestion & Man-in-the-middle or producer compromise & Ingestion / Hashing & Canonicalization + cryptographic hashing $H_t$ & Detected unless hash broken \\
+
+\hline
+
+Lineage Truncation / Reordering & Removing or reordering historical records to hide events & Control over storage or transmission & Lineage Chain & Recursive hash chaining ensures forward integrity & Requires breaking hash function \\
+
+\hline
+
+Validator Collusion & Malicious subset of validators approving invalid telemetry & Control over $\geq t$ validators & Validator Network & Threshold signatures with $f < t$ assumption & System fails if threshold exceeded \\
+
+\hline
+
+Signature Forgery & Forging validator signatures without authorization & Breaking signature scheme (EUF-CMA) & Validation Layer & Secure digital signatures (Ed25519 / BLS) & Negligible under standard assumptions \\
+
+\hline
+
+Denial of Service (DoS) & Flooding system to delay or block validation & Network or resource exhaustion & API / Validator Layer & Rate limiting, batching, and distributed validation & Availability degradation possible \\
+
+\hline
+
+Message Injection & Injecting unauthorized telemetry into system & Unauthorized API access & API Gateway & Authentication, request validation & Depends on access control strength \\
+
+\hline
+
+Aggregation Manipulation & Tampering with signature aggregation process & Control over aggregation layer & Aggregation Engine & Deterministic aggregation + verification checks & Detected during final verification \\
+
+\hline
+
+Storage Corruption & Altering stored telemetry or proofs & Storage compromise & Persistence Layer & Append-only storage + verification via lineage & Detectable via recomputation \\
+
+\hline
+
+\end{tabularx}
+\end{table}
+
 \section{Security Experiment}
 
 We define a security experiment $\text{Exp}_{\mathcal{A}}^{\text{RCO}}(\lambda)$ parameterized by a security parameter $\lambda$.

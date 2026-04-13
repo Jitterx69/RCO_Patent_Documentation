@@ -225,3 +225,51 @@ The RCO protocol provides a blueprint for addressing this need, offering a princ
 \section{Conclusion}
 
 This section has established a deeper theoretical foundation for the RCO protocol by framing it within information theory, distributed systems theory, and system abstraction. By interpreting telemetry integrity as an information problem, aligning the protocol with established principles of distributed systems, and defining a new class of feedback-coupled integrity systems, we demonstrate that the RCO protocol represents a fundamental advancement rather than an incremental improvement. These insights reinforce the novelty and significance of the protocol and provide a strong theoretical basis for its adoption and further development.
+
+\begin{table}[htbp]
+\footnotesize
+\centering
+\caption{State Transition Model Under RCO Validation Constraints}
+\label{tab:state-transition}
+
+\renewcommand{\arraystretch}{1.25}
+
+\begin{tabularx}{\textwidth}{|p{2.5cm}|p{2.5cm}|X|p{2.5cm}|X|}
+\hline
+\textbf{Current State} & \textbf{Input} & \textbf{Condition} & \textbf{Next State} & \textbf{Validity Constraint} \\
+\hline
+
+$S_t$ & $D_t$ & Input received but not yet validated & No transition & Transition blocked until validation \\
+
+\hline
+
+$S_t$ & $D_t$ & RCO validation fails & $S_t$ (unchanged) & Invalid input must not affect state \\
+
+\hline
+
+$S_t$ & $D_t$ & RCO validation succeeds & $S_{t+1} = \mathcal{F}(S_t, D_t)$ & Only validated input drives transition \\
+
+\hline
+
+$S_t$ & Replayed $D_t$ & Lineage mismatch ($L_t \neq L_t'$) & $S_t$ (unchanged) & Replay attempts rejected \\
+
+\hline
+
+$S_t$ & $(D_t, S_t')$ & State mismatch ($S_t' \neq S_t$) & $S_t$ (unchanged) & State binding enforces context integrity \\
+
+\hline
+
+$S_t$ & $D_t$ & Insufficient validator signatures ($< t$) & $S_t$ (unchanged) & Threshold condition not satisfied \\
+
+\hline
+
+$S_t$ & $D_t$ & Aggregated signature invalid & $S_t$ (unchanged) & Cryptographic verification must succeed \\
+
+\hline
+
+$S_t$ & $\emptyset$ & No input & $S_t$ & System remains stable without input \\
+
+\hline
+
+\end{tabularx}
+\end{table}

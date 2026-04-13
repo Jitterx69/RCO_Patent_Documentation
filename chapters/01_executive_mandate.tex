@@ -759,6 +759,70 @@ t = t_{\text{prev}} + 1
 
 as a necessary condition for acceptance, ensuring that the telemetry sequence is complete and strictly ordered.
 
+\begin{table}[htbp]
+\footnotesize
+\centering
+\caption{Comparison of RCO with Traditional Logging and Blockchain-Based Systems}
+\label{tab:comparison}
+
+\renewcommand{\arraystretch}{1.25}
+
+\begin{tabularx}{\textwidth}{|p{3.2cm}|X|X|X|}
+\hline
+\textbf{Property} & \textbf{Traditional Logging Systems} & \textbf{Blockchain / Ledger Systems} & \textbf{RCO Protocol} \\
+\hline
+
+Validation Timing & Post-ingestion (after storage) & Post-commit (after block inclusion) & Pre-ingestion (before persistence) \\
+
+\hline
+
+Data Integrity Model & Best-effort or audit-based & Cryptographic chain integrity & Cryptographic validation + enforced admission control \\
+
+\hline
+
+State Awareness & No explicit state binding & Limited (transaction context only) & Explicit binding to system state $S_t$ \\
+
+\hline
+
+Replay Resistance & Weak (requires external checks) & Partial (depends on transaction uniqueness) & Strong via lineage $L_t$ and state binding $M_t$ \\
+
+\hline
+
+Trust Model & Centralized authority & Distributed consensus & Threshold-based distributed validation $(n, t, f)$ \\
+
+\hline
+
+Failure Handling & Detection after compromise & Forks / reorganization possible & Immediate rejection of invalid inputs \\
+
+\hline
+
+Data Admission Control & None (all data stored) & All valid transactions included & Only validated data admitted \\
+
+\hline
+
+Latency Characteristics & Low (no pre-validation) & High (consensus overhead) & Moderate (parallel validation) \\
+
+\hline
+
+Scalability & High but weak guarantees & Limited by consensus throughput & Scales with validator parallelism \\
+
+\hline
+
+Auditability & Requires external verification & Built-in but heavy & Built-in, lightweight, and verifiable \\
+
+\hline
+
+System Coupling & Decoupled from system state & Weak coupling & Strong feedback-coupled system model \\
+
+\hline
+
+Primary Use Case & Logging, monitoring & Financial transactions, ledgers & Real-time validated telemetry and control systems \\
+
+\hline
+
+\end{tabularx}
+\end{table}
+
 From a dynamical systems perspective, the RCO protocol eliminates the perturbation channel $\delta_t$ by enforcing:
 
 \begin{equation}

@@ -82,6 +82,76 @@ Despite centralized deployment, zero-trust assumptions are maintained:
 \forall V_i, \quad \text{independent verification required}
 \end{equation}
 
+\begin{table}[htbp]
+\footnotesize
+\centering
+\caption{Deployment Configurations and Infrastructure Profiles for RCO}
+\label{tab:deployment-config}
+
+\renewcommand{\arraystretch}{1.25}
+
+\begin{tabularx}{\textwidth}{|p{3cm}|X|p{2.5cm}|p{2.5cm}|p{2cm}|X|}
+\hline
+\textbf{Deployment Type} & \textbf{Components Placement} & \textbf{Latency Profile} & \textbf{Fault Tolerance} & \textbf{Cost Tier} & \textbf{Typical Use Case} \\
+\hline
+
+Edge Deployment & 
+Producers, ingestion, and partial validation at edge nodes; minimal central coordination &
+Very low (local processing) &
+Moderate (limited redundancy) &
+Low &
+IoT systems, real-time control, robotics \\
+
+\hline
+
+Cloud Deployment &
+All components (API, validators, storage) centralized in cloud infrastructure &
+Moderate (network dependent) &
+High (redundant cloud services) &
+Medium–High &
+Enterprise systems, SaaS platforms, analytics pipelines \\
+
+\hline
+
+Hybrid Deployment &
+Edge ingestion + cloud-based validation and storage layers &
+Low-to-moderate &
+High (distributed redundancy) &
+Medium &
+Distributed applications requiring both low latency and global validation \\
+
+\hline
+
+Validator-Decentralized &
+Validators distributed across independent domains or organizations &
+Moderate (cross-network communication) &
+Very high (Byzantine resilience) &
+Medium–High &
+Multi-party systems, inter-organizational trust environments \\
+
+\hline
+
+High-Security Deployment &
+Dedicated validator infrastructure with strict isolation and hardened environments &
+Moderate &
+Very high (controlled trust boundaries) &
+High &
+Defense, critical infrastructure, regulated environments \\
+
+\hline
+
+High-Throughput Deployment &
+Optimized batching, parallel validation, and scalable validator clusters &
+Low-to-moderate (amortized) &
+High &
+Medium &
+Streaming systems, financial transaction processing \\
+
+\hline
+
+\end{tabularx}
+\end{table}
+
 \section{Edge Infrastructure Profile}
 
 \subsection{Definition}

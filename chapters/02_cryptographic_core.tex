@@ -28,6 +28,50 @@ where $\mathcal{S}$ is a canonical serialization operator, $\mathcal{H}$ is a cr
 
 The deterministic serialization layer constitutes the foundational component of the cryptographic core, as it ensures that all subsequent cryptographic operations operate on a uniquely defined binary representation. Without this property, the guarantees provided by cryptographic hashing and chaining are invalidated, as identical logical inputs may produce divergent outputs.
 
+\begin{table}[htbp]
+\footnotesize
+\centering
+\caption{Cryptographic Primitives Used in the RCO Protocol}
+\label{tab:crypto-primitives}
+
+\renewcommand{\arraystretch}{1.25}
+
+\begin{tabularx}{\textwidth}{|p{2.8cm}|p{3cm}|X|X|p{2.5cm}|}
+\hline
+\textbf{Primitive} & \textbf{Algorithm / Family} & \textbf{Security Property} & \textbf{Role in RCO} & \textbf{Output Size} \\
+\hline
+
+Cryptographic Hash Function & SHA-256 / SHA-3 & Preimage resistance, second-preimage resistance, collision resistance & Used for canonical hashing ($H_t$), lineage construction ($L_t$), and state binding & 256 bits \\
+
+\hline
+
+Hash Composition (Chaining) & Iterative hash construction & Forward integrity, tamper propagation & Forms lineage chain $L_t = \mathcal{H}(H_t \parallel L_{t-1})$ & 256 bits \\
+
+\hline
+
+State Hashing & Standard hash mapping & Binding of system state to telemetry & Computes $\mathcal{H}(S_t)$ for Proof of Reflexion & 256 bits \\
+
+\hline
+
+Digital Signature Scheme & Ed25519 / ECDSA & Unforgeability under chosen-message attack (EUF-CMA) & Validators sign message $M_t$ to produce $\sigma_i$ & 512 bits (typical) \\
+
+\hline
+
+Threshold Signature / Aggregation & BLS / Multi-signature aggregation & Collective unforgeability, threshold security & Aggregates $\{\sigma_i\}$ into $\Sigma_t$ under threshold $t$ & Constant-size or aggregated \\
+
+\hline
+
+Message Authentication Structure & Concatenation with domain separation & Context binding and collision avoidance & Forms $M_t = \mathcal{H}(S_t) \parallel L_t$ & Variable \\
+
+\hline
+
+Randomness Source (if applicable) & Cryptographic RNG & Unpredictability & Used for nonce generation, validator operations (optional) & Variable \\
+
+\hline
+
+\end{tabularx}
+\end{table}
+
 \subsection{Formal Definition of Serialization}
 
 Let $\mathcal{D}$ denote the space of structured telemetry data, which may be represented as a finite set of key-value pairs:

@@ -32,6 +32,52 @@ subject to the constraints defined by the RCO protocol.
 
 The architecture is decomposed into the following primary components:
 
+\begin{tabularx}{\textwidth}{|p{2.5cm}|X|X|X|p{2cm}|X|}
+\hline
+\textbf{Component} & \textbf{Role} & \textbf{Inputs} & \textbf{Outputs} & \textbf{Trust Level} & \textbf{Failure Impact} \\
+\hline
+
+Telemetry Producers & Generate telemetry data from systems and services & $S_t$, $D_t$ & $D_t$ & Untrusted & Malicious or malformed data injection \\
+
+\hline
+
+Canonicalization Engine & Ensures deterministic serialization across systems & $D_t$ & $\tilde{D}_t$ & Trusted & Non-deterministic encoding breaks integrity \\
+
+\hline
+
+Hashing Module & Computes cryptographic hash of telemetry & $\tilde{D}_t$ & $H_t$ & Trusted & Collision or weak hashing compromises security \\
+
+\hline
+
+Lineage Engine & Builds cryptographic chain of telemetry batches & $H_t$, $H_{t-1}$ & $L_t$ & Trusted & Tampering or reordering attacks \\
+
+\hline
+
+State Binding Module & Binds telemetry to system state & $S_t$, $L_t$ & $M_t$ & Trusted & State substitution attacks \\
+
+\hline
+
+Validator Network & Verifies and signs telemetry data & $M_t$ & $\sigma_i$ & Distributed & Malicious validation or collusion \\
+
+\hline
+
+Aggregation Layer & Combines validator signatures & $\{\sigma_i\}$ & $\Sigma_t$ & Trusted & Invalid aggregation \\
+
+\hline
+
+Verification Engine & Validates aggregated proof & $\Sigma_t$, $M_t$ & Decision & Trusted & Accepting invalid data \\
+
+\hline
+
+Persistence Layer & Stores validated records & $(M_t, \Sigma_t)$ & Immutable records & Trusted & Data corruption or loss \\
+
+\hline
+
+Audit \& Query Service & Enables verification and tracing & Records & Proofs & Trusted & Incorrect audit results \\
+
+\hline
+\end{tabularx}
+
 \subsection{Telemetry Producers}
 
 Telemetry producers are entities that generate raw telemetry data from system processes, sensors, or computational outputs. Formally, a producer implements:
@@ -206,6 +252,62 @@ as signature generation and verification can be parallelized.
 The system architecture presented in this section provides a direct mapping from the formal RCO model to a deployable infrastructure. By decomposing the protocol into well-defined components and enforcing deterministic processing at each stage, the architecture preserves the integrity guarantees established in the cryptographic and security analyses while enabling practical implementation in distributed environments.
 
 \section{Pipeline Execution and Sequence Semantics}
+
+\begin{table}[htbp]
+\footnotesize
+\centering
+\caption{RCO Pipeline Stage Specification and Execution Semantics}
+\label{tab:pipeline-stages}
+
+\renewcommand{\arraystretch}{1.25}
+
+\begin{tabularx}{\textwidth}{|p{2.3cm}|X|X|X|X|}
+\hline
+\textbf{Stage} & \textbf{Operation} & \textbf{Input $\rightarrow$ Output} & \textbf{Guarantees} & \textbf{Failure Condition} \\
+\hline
+
+Telemetry Ingestion & Accepts raw telemetry from producers & $D_t \rightarrow$ buffered input & Input captured without mutation & Missing or malformed input \\
+
+\hline
+
+Canonicalization & Deterministic byte representation & $D_t \rightarrow \tilde{D}_t$ & Identical input yields identical encoding & Schema mismatch or nondeterminism \\
+
+\hline
+
+Hashing & Cryptographic digest computation & $\tilde{D}_t \rightarrow H_t$ & Deterministic hash function & Collision or weak hash \\
+
+\hline
+
+Lineage Construction & Sequential hash chaining & $(H_t, L_{t-1}) \rightarrow L_t$ & Strict temporal dependency & Missing or corrupted lineage \\
+
+\hline
+
+State Binding & Bind telemetry to system state & $(S_t, L_t) \rightarrow M_t$ & Context-dependent integrity & State substitution \\
+
+\hline
+
+Validation Dispatch & Broadcast to validators & $M_t \rightarrow$ distributed messages & Identical input across validators & Network partition \\
+
+\hline
+
+Validator Verification & Independent signature generation & $M_t \rightarrow \sigma_i$ & Deterministic verification logic & Malicious or invalid signatures \\
+
+\hline
+
+Signature Aggregation & Threshold-based aggregation & $\{\sigma_i\} \rightarrow \Sigma_t$ & Deterministic threshold policy & Insufficient valid signatures \\
+
+\hline
+
+Final Verification & Validate aggregated proof & $(\Sigma_t, M_t) \rightarrow$ decision & Cryptographic correctness enforced & Signature mismatch \\
+
+\hline
+
+Persistence & Store validated data only & $(M_t, \Sigma_t) \rightarrow$ record & Only accepted data persisted & Storage failure \\
+
+\hline
+
+\end{tabularx}
+\end{table}
 
 The RCO architecture is realized as a deterministic execution pipeline in which telemetry data flows through a sequence of transformation and verification stages. Each stage enforces a specific invariant and produces an output that serves as the input to the next stage. The correctness of the system depends on the strict ordering and deterministic execution of these stages across all participating nodes.
 
@@ -530,6 +632,76 @@ L_i = \mathcal{H}(H_i \concat L_{i-1})
 \section{Data Structures}
 
 The system maintains several core data structures.
+
+\begin{table}[htbp]
+\footnotesize
+\centering
+\caption{Core Data Structures in the RCO Protocol}
+\label{tab:data-structures}
+
+\renewcommand{\arraystretch}{1.25}
+
+\begin{tabularx}{\textwidth}{|p{3cm}|p{3cm}|X|X|X|}
+\hline
+\textbf{Structure} & \textbf{Field} & \textbf{Type} & \textbf{Description} & \textbf{Constraints} \\
+\hline
+
+\multirow{3}{*}{Telemetry Input $D_t$}
+ & data & JSON / Binary & Raw telemetry payload & Must be canonicalizable \\
+ & metadata & JSON & Timestamp, source, identifiers & Required fields present \\
+ & state & JSON / Object & System state representation $S_t$ & Deterministic encoding required \\
+
+\hline
+
+\multirow{2}{*}{Canonical Data $\tilde{D}_t$}
+ & bytes & Byte array & Deterministic serialized representation & Stable across systems \\
+ & schema & Identifier & Schema version reference & Must match canonical rules \\
+
+\hline
+
+\multirow{1}{*}{Hash $H_t$}
+ & digest & Byte array & Cryptographic hash of $\tilde{D}_t$ & Fixed length (e.g., 256 bits) \\
+
+\hline
+
+\multirow{2}{*}{Lineage $L_t$}
+ & current & Byte array & Current lineage hash & Derived via chaining \\
+ & previous & Byte array & Previous lineage state $L_{t-1}$ & Must exist unless genesis \\
+
+\hline
+
+\multirow{2}{*}{Bound Message $M_t$}
+ & state\_hash & Byte array & $\mathcal{H}(S_t)$ & Deterministic \\
+ & lineage & Byte array & $L_t$ & Immutable once computed \\
+
+\hline
+
+\multirow{2}{*}{Validator Signature $\sigma_i$}
+ & validator\_id & String & Identifier of validator node & Unique per validator \\
+ & signature & Byte array & Digital signature over $M_t$ & Must verify under public key \\
+
+\hline
+
+\multirow{2}{*}{Aggregated Signature $\Sigma_t$}
+ & signatures & Set & Collection of $\sigma_i$ & Size $\geq t$ \\
+ & aggregate & Byte array & Combined signature proof & Deterministic aggregation \\
+
+\hline
+
+\multirow{2}{*}{Stored Record}
+ & message & $M_t$ & Bound message & Immutable \\
+ & proof & $\Sigma_t$ & Aggregated validation proof & Must verify before storage \\
+
+\hline
+
+\multirow{2}{*}{Audit Record}
+ & lineage\_chain & List & Sequence of lineage hashes & Fully reconstructible \\
+ & verification\_status & Boolean & Result of verification & Must be reproducible \\
+
+\hline
+
+\end{tabularx}
+\end{table}
 
 \subsection{Telemetry Record}
 
